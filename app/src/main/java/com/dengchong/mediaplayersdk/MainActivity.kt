@@ -27,7 +27,13 @@ class MainActivity : AppCompatActivity() {
         MediaPlayer.listener = object : MediaPlayerListener {
             override fun onPrepared() {
                 super.onPrepared()
+                MediaPlayer.start()
                 ALog.d("已经准备好了！！！")
+            }
+
+            override fun onCompleted() {
+                super.onCompleted()
+                ALog.d("已经播放完成了！！！")
             }
         }
     }

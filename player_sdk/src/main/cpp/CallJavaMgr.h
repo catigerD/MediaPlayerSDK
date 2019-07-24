@@ -20,6 +20,7 @@ private:
     jobject jobj = nullptr;
 
     jmethodID mid_prepared = nullptr;
+    jmethodID mid_completed = nullptr;
 
 public:
     CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo);
@@ -28,6 +29,8 @@ public:
 
     //todo 使用可变参数优化代码？
     void callPrepared(ThreadType type);
+
+    void callCompleted(ThreadType type);
 };
 
 

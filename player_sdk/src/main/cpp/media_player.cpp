@@ -2,12 +2,14 @@
 #include <string>
 #include "CallJavaMgr.h"
 #include "MediaPlayer.h"
+#include "MediaStatus.h"
 
 extern "C" {
 #include "libavformat/avformat.h"
 }
 
 JavaVM *globalJVM = nullptr;
+MediaStatus *status = nullptr;
 CallJavaMgr *callJavaMgr = nullptr;
 MediaPlayer *mediaPlayer = nullptr;
 
@@ -33,6 +35,15 @@ Java_com_dengchong_player_1sdk_MediaPlayer_n_1prepare(JNIEnv *env, jobject insta
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_dengchong_player_1sdk_MediaPlayer_n_1initJVM(JNIEnv *env, jobject instance) {
+    status = new MediaStatus;
     callJavaMgr = new CallJavaMgr(globalJVM, env, instance);
-    mediaPlayer = new MediaPlayer(callJavaMgr);
+    mediaPlayer = new MediaPlayer(status, callJavaMgr);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_dengchong_player_1sdk_MediaPlayer_n_1start(JNIEnv *env, jobject instance) {
+    if (mediaPlayer != nullptr) {
+        mediaPlayer->start();
+    }
 }

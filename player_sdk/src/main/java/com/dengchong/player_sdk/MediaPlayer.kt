@@ -24,11 +24,21 @@ object MediaPlayer {
         n_prepare(url)
     }
 
+    fun start() {
+        n_start();
+    }
+
     private fun callPrepared() {
         listener?.onPrepared()
+    }
+
+    private fun callCompleted() {
+        listener?.onCompleted()
     }
 
     private external fun n_initJVM();
 
     private external fun n_prepare(url: String)
+
+    private external fun n_start();
 }

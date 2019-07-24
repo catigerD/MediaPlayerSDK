@@ -4,4 +4,8 @@ interface MediaPlayerListener {
     fun onPrepared() {
 
     }
+
+    fun onCompleted() {
+
+    }
 }

@@ -1,32 +1,15 @@
 //
-// Created by dengchong on 2019-07-24.
+// Created by dengchong on 2019-07-13.
 //
 
-#ifndef MEDIAPLAYERSDK_ANDROIDLOG_H
-#define MEDIAPLAYERSDK_ANDROIDLOG_H
+#ifndef AVPLAYER_ANDROIDLOG_H
+#define AVPLAYER_ANDROIDLOG_H
 
-#include <android/log.h>
-#include <string>
+#include "android/log.h"
 
-using namespace std;
+#define LOG_DEBUG true
 
-class ALog {
-public:
-    static const bool DEBUG = true;
-    static const string TAG;
+#define LOGI(FORMAT, ...) __android_log_print(ANDROID_LOG_INFO,"avplayer",FORMAT,##__VA_ARGS__)
+#define LOGE(FORMAT, ...) __android_log_print(ANDROID_LOG_ERROR,"avplayer",FORMAT,##__VA_ARGS__)
 
-    static void d(const string format, initializer_list<const char *> args = {}) {
-        if (DEBUG) {
-            __android_log_print(ANDROID_LOG_DEBUG, TAG.c_str(), format.c_str(), args);
-        }
-    }
-
-    static void e(const string format, initializer_list<const char *> args = {}) {
-        if (DEBUG) {
-            __android_log_print(ANDROID_LOG_ERROR, TAG.c_str(), format.c_str(), args);
-        }
-    }
-};
-
-#endif //MEDIAPLAYERSDK_ANDROIDLOG_H
-
+#endif //AVPLAYER_ANDROIDLOG_H

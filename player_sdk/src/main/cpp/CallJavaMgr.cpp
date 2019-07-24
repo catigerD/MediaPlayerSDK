@@ -10,10 +10,11 @@ CallJavaMgr::CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo) :
         jobj(jniEnv->NewGlobalRef(jo)) {
     jclass clz = env->GetObjectClass(jobj);
     if (clz == nullptr) {
-        ALog::e("env->GetObjectClass(jobj) is null");
+        LOGE("env->GetObjectClass(jobj) is null");
         return;
     }
     mid_prepared = env->GetMethodID(clz, "callPrepared", "()V");
+    mid_completed = env->GetMethodID(clz, "callCompleted", "()V");
 }
 
 CallJavaMgr::~CallJavaMgr() {
@@ -31,10 +32,30 @@ void CallJavaMgr::callPrepared(ThreadType type) {
         case THREAD_CHILD:
             JNIEnv *env;
             if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-                ALog::e("AttachCurrentThread fail");
+                LOGE("AttachCurrentThread fail");
                 return;
             }
             env->CallVoidMethod(jobj, mid_prepared);
+            javaVM->DetachCurrentThread();
+            break;
+    }
+}
+
+void CallJavaMgr::callCompleted(ThreadType type) {
+    if (mid_completed == nullptr) {
+        return;
+    }
+    switch (type) {
+        case THREAD_MAIN:
+            jniEnv->CallVoidMethod(jobj, mid_completed);
+            break;
+        case THREAD_CHILD:
+            JNIEnv *env;
+            if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+                LOGE("AttachCurrentThread fail");
+                return;
+            }
+            env->CallVoidMethod(jobj, mid_completed);
             javaVM->DetachCurrentThread();
             break;
     }
