@@ -2,11 +2,12 @@ cmake_minimum_required(VERSION 3.4.1)
 
 add_compile_options(-Wall)
 
-include_directories(src/main/cpp/include)
-aux_source_directory(src/main/cpp CPP_DIR)
+include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp)
+include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/include)
+aux_source_directory(${CMAKE_SOURCE_DIR}/src/main/cpp CPP_DIR)
 
 add_library( # Sets the name of the library.
-        native-lib
+        media-player
 
         # Sets the library as a shared library.
         SHARED
@@ -60,7 +61,7 @@ set_target_properties(swscale-4
         ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}/libswscale-4.so)
 
 target_link_libraries( # Specifies the target library.
-        native-lib
+        media-player
 
         avcodec-57
         avdevice-57
