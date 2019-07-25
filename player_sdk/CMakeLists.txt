@@ -72,4 +72,5 @@ target_link_libraries( # Specifies the target library.
         swresample-2
         swscale-4
 
-        log)
+        log
+        OpenSLES)

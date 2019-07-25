@@ -23,6 +23,7 @@ void MediaPlayer::prepareFfmpeg() {
 
     //1.注册协议，复用，编解码器
     av_register_all();
+    avformat_network_init();
 
     //2.读取文件头信息，填充AVInputFormat到 AVFormatContext 结构体
     formatContext = avformat_alloc_context();//分配内存,可能存在分配内存错误情况
@@ -45,9 +46,8 @@ void MediaPlayer::prepareFfmpeg() {
 
     for (int i = 0; i < formatContext->nb_streams; i++) {
         if (AVMEDIA_TYPE_AUDIO == formatContext->streams[i]->codecpar->codec_type) {
-            audioMgr = new AudioMgr(status);
+            audioMgr = new AudioMgr(status, formatContext->streams[i]);
             audioMgr->streamIndex = i;
-            audioMgr->codecParameters = formatContext->streams[i]->codecpar;
             break;
         }
     }
@@ -58,7 +58,7 @@ void MediaPlayer::prepareFfmpeg() {
     }
 
     //4.获取解码器并打开
-    AVCodec *codec = avcodec_find_decoder(audioMgr->codecParameters->codec_id);
+    AVCodec *codec = avcodec_find_decoder(audioMgr->stream->codecpar->codec_id);
     if (codec == nullptr) {
         LOGE("avcodec_find_decoder() fail for url : %s", url.c_str());
         return;
@@ -68,7 +68,7 @@ void MediaPlayer::prepareFfmpeg() {
         LOGE("avcodec_alloc_context3() fail for url : %s", url.c_str());
         return;
     }
-    ret = avcodec_parameters_to_context(codecContext, audioMgr->codecParameters);
+    ret = avcodec_parameters_to_context(codecContext, audioMgr->stream->codecpar);
     if (ret < 0) {
         LOGE("avcodec_parameters_to_context() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
         return;
@@ -92,7 +92,7 @@ void *readPacket(void *data) {
 
     int ret = 0;
     int count = 0;
-    mediaPlayer->audioMgr->decode();
+    mediaPlayer->audioMgr->start();
 
     while (!mediaPlayer->status->exit) {
         if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE) {
