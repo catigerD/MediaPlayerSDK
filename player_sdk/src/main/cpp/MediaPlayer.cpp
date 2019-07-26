@@ -4,9 +4,8 @@
 
 #include "MediaPlayer.h"
 
-MediaPlayer::MediaPlayer(MediaStatus *status, CallJavaMgr *callJavaMg) :
-        callJavaMgr(callJavaMg),
-        status(status) {
+MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
+        callJavaMgr(callJavaMg) {
 }
 
 MediaPlayer::~MediaPlayer() {
@@ -46,7 +45,7 @@ void MediaPlayer::prepareFfmpeg() {
 
     for (int i = 0; i < formatContext->nb_streams; i++) {
         if (AVMEDIA_TYPE_AUDIO == formatContext->streams[i]->codecpar->codec_type) {
-            audioMgr = new AudioMgr(status, formatContext->streams[i]);
+            audioMgr = new AudioMgr(&status, formatContext->streams[i]);
             audioMgr->streamIndex = i;
             break;
         }
@@ -94,7 +93,8 @@ void *readPacket(void *data) {
     int count = 0;
     mediaPlayer->audioMgr->start();
 
-    while (!mediaPlayer->status->exit) {
+    while (!mediaPlayer->status.exit) {
+        mediaPlayer->status.read = true;
         if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE) {
             sleep();
             continue;
@@ -113,11 +113,11 @@ void *readPacket(void *data) {
             av_packet_free(&packet);
             av_free(packet);
             //等待数据包消耗完成
-            while (!mediaPlayer->status->exit) {
+            while (!mediaPlayer->status.exit) {
                 if (mediaPlayer->audioMgr->pktQueue->size() > 0) {
                     sleep();
                 } else {
-                    mediaPlayer->status->exit = true;
+                    mediaPlayer->status.exit = true;
                 }
             }
         }
@@ -126,11 +126,25 @@ void *readPacket(void *data) {
     LOGI("读取完成----------");
     mediaPlayer->callJavaMgr->callCompleted(THREAD_CHILD);
 
+    mediaPlayer->status.read = false;
     pthread_exit(&mediaPlayer->readPktTid);
 }
 
 void MediaPlayer::start() {
     pthread_create(&readPktTid, nullptr, readPacket, this);
+}
+
+void MediaPlayer::stop() {
+    status.exit = true;
+
+    if (audioMgr != nullptr) {
+        audioMgr->stop();
+    }
+
+    while (status.read || status.decode) {
+        sleep();
+    }
+    sleep();
 }
 
 

@@ -10,9 +10,9 @@ PacketQueue::PacketQueue(MediaStatus *status) : status(status) {
 }
 
 PacketQueue::~PacketQueue() {
+    clearAVPacket();
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&mutex);
-    clearAVPacket();
 }
 
 bool PacketQueue::putAVPacket(AVPacket *packet) {

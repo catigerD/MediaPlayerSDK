@@ -33,23 +33,25 @@ private:
     //回调 java 层
     CallJavaMgr *callJavaMgr = nullptr;
 
-    MediaStatus *status;
-
     //audio相关
     AudioMgr *audioMgr;
+
+    MediaStatus status;
 
     pthread_t readPktTid;
 
     void prepareFfmpeg();
 
 public:
-    MediaPlayer(MediaStatus *status, CallJavaMgr *callJavaMgr);
+    MediaPlayer(CallJavaMgr *callJavaMgr);
 
     ~MediaPlayer();
 
     void prepare(const string urlParam);
 
     void start();
+
+    void stop();
 };
 
 

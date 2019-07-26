@@ -11,6 +11,10 @@ private:
 
 public:
     bool exit = false;
+
+    bool read = false;
+
+    bool decode = false;
 };
 
 

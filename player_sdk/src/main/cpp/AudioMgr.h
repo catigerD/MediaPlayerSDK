@@ -54,6 +54,8 @@ private:
 
     void createBufferQueueAudioPlayer();
 
+    void destroyOpenSLES();
+
     //解码相关资源
     AVPacket *packet = nullptr;
     AVFrame *frame = nullptr;
@@ -77,6 +79,8 @@ public:
     AVCodecContext *codecContext = nullptr;
 
     void start();
+
+    void stop();
 };
 
 

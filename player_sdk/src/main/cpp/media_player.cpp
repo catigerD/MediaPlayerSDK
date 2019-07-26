@@ -9,7 +9,6 @@ extern "C" {
 }
 
 JavaVM *globalJVM = nullptr;
-MediaStatus *status = nullptr;
 CallJavaMgr *callJavaMgr = nullptr;
 MediaPlayer *mediaPlayer = nullptr;
 
@@ -28,6 +27,12 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_dengchong_player_1sdk_MediaPlayer_n_1prepare(JNIEnv *env, jobject instance, jstring url_) {
     const char *url = env->GetStringUTFChars(url_, 0);
+    if (mediaPlayer != nullptr) {
+        mediaPlayer->stop();
+        delete mediaPlayer;
+        mediaPlayer = nullptr;
+    }
+    mediaPlayer = new MediaPlayer(callJavaMgr);
     mediaPlayer->prepare(url);
     env->ReleaseStringUTFChars(url_, url);
 }
@@ -35,9 +40,7 @@ Java_com_dengchong_player_1sdk_MediaPlayer_n_1prepare(JNIEnv *env, jobject insta
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_dengchong_player_1sdk_MediaPlayer_n_1initJVM(JNIEnv *env, jobject instance) {
-    status = new MediaStatus;
     callJavaMgr = new CallJavaMgr(globalJVM, env, instance);
-    mediaPlayer = new MediaPlayer(status, callJavaMgr);
 }
 
 extern "C"
@@ -45,5 +48,15 @@ JNIEXPORT void JNICALL
 Java_com_dengchong_player_1sdk_MediaPlayer_n_1start(JNIEnv *env, jobject instance) {
     if (mediaPlayer != nullptr) {
         mediaPlayer->start();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_dengchong_player_1sdk_MediaPlayer_n_1stop(JNIEnv *env, jobject instance) {
+    if (mediaPlayer != nullptr) {
+        mediaPlayer->stop();
+        delete mediaPlayer;
+        mediaPlayer = nullptr;
     }
 }

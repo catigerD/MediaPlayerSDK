@@ -15,8 +15,10 @@ AudioMgr::AudioMgr(MediaStatus *status, AVStream *stream) :
 AudioMgr::~AudioMgr() {
     delete[] swrBuf;
     delete pktQueue;
+    releaseDecodeRes();
     avcodec_close(codecContext);
     avcodec_free_context(&codecContext);
+    destroyOpenSLES();
 }
 
 void *startThread(void *data) {
@@ -154,14 +156,33 @@ void AudioMgr::createBufferQueueAudioPlayer() {
     (void) result;
 }
 
+void AudioMgr::destroyOpenSLES() {
+    if (playObject != nullptr) {
+        (*playObject)->Destroy(playObject);
+        playItf = nullptr;
+        androidSimpleBufferQueueItf = nullptr;
+    }
+    if (outputMixObject != nullptr) {
+        (*outputMixObject)->Destroy(outputMixObject);
+        environmentalReverbItf = nullptr;
+    }
+    if (engineObject != nullptr) {
+        (*engineObject)->Destroy(engineObject);
+        engineItf = nullptr;
+    }
+}
+
 int AudioMgr::decode(uint8_t **outputBuf, int *size) {
     int ret = 0;
     while (!status->exit) {
+        status->decode = true;
         if (pktQueue->size() <= 0) {
+            status->decode = false;
             continue;
         }
         if (decodeAPacketFinish) {
             if (!pktQueue->getAVPacket(&packet)) {
+                status->decode = false;
                 continue;
             }
             ret = avcodec_send_packet(codecContext, packet);
@@ -169,6 +190,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
                 LOGI("start loop avcodec_send_packet fail ,error msg : %s", av_err2str(ret));
                 releaseDecodeRes();
                 decodeAPacketFinish = true;
+                status->decode = false;
                 continue;
             }
         }
@@ -178,6 +200,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
             LOGI("start loop avcodec_receive_frame fail ,error msg : %s", av_err2str(ret));
             releaseDecodeRes();
             decodeAPacketFinish = true;
+            status->decode = false;
             continue;
         }
         //消耗 frame
@@ -196,6 +219,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
             LOGI("start loop swrContext = nullptr ,error msg");
             releaseDecodeRes();
             decodeAPacketFinish = true;
+            status->decode = false;
             continue;
         }
         int init = swr_init(swrContext);
@@ -203,6 +227,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
             LOGI("start loop swr_init fail ,error msg : %s", av_err2str(init));
             releaseDecodeRes();
             decodeAPacketFinish = true;
+            status->decode = false;
             continue;
         }
 
@@ -217,7 +242,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
         *size *= 4;
 
         releaseDecodeRes();
-
+        status->decode = false;
         break;
     }
     return ret;
@@ -280,5 +305,11 @@ void AudioMgr::releaseDecodeRes() {
     }
     if (packet != nullptr) {
         av_packet_free(&packet);
+    }
+}
+
+void AudioMgr::stop() {
+    if (playItf != nullptr) {
+        (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_STOPPED);
     }
 }

@@ -25,7 +25,11 @@ object MediaPlayer {
     }
 
     fun start() {
-        n_start();
+        n_start()
+    }
+
+    fun stop() {
+        n_stop()
     }
 
     private fun callPrepared() {
@@ -36,9 +40,11 @@ object MediaPlayer {
         listener?.onCompleted()
     }
 
-    private external fun n_initJVM();
+    private external fun n_initJVM()
 
     private external fun n_prepare(url: String)
 
-    private external fun n_start();
+    private external fun n_start()
+
+    private external fun n_stop()
 }
