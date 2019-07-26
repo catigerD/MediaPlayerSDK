@@ -4,7 +4,7 @@
 
 #include "AudioMgr.h"
 
-AudioMgr::AudioMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, AVStream *stream, int index, int64_t duration) :
+AudioMgr::AudioMgr(CallJavaMgr *callJavaMgr, MediaStatus *status, int index, AVStream *stream, int64_t duration) :
         status(status),
         callJavaMgr(callJavaMgr),
         stream(stream),
@@ -182,7 +182,10 @@ void pcmSimpleBufferQueueCallback(
     LOGI("pcmSimpleBufferQueueCallback: size : %d", size);
     if (ret == 0) {
         audioMgr->clock += size / (double) (audioMgr->sample_rate * 2 * 2);
-        audioMgr->callJavaTimeInfo(audioMgr->clock, static_cast<int>(audioMgr->duration));
+        if (audioMgr->clock - audioMgr->last_clock > 0.1) {
+            audioMgr->callJavaTimeInfo(audioMgr->clock, static_cast<int>(audioMgr->duration));
+            audioMgr->last_clock = audioMgr->clock;
+        }
         (*audioMgr->androidSimpleBufferQueueItf)->Enqueue(
                 audioMgr->androidSimpleBufferQueueItf, data, static_cast<SLuint32>(size));
     }
@@ -191,6 +194,10 @@ void pcmSimpleBufferQueueCallback(
 int AudioMgr::decode(uint8_t **outputBuf, int *size) {
     int ret = 0;
     while (status != nullptr && !status->exit) {
+        if (status != nullptr && status->seek) {
+            sleep();
+            continue;
+        }
         status->decode = true;
         if (pktQueue->size() <= 0) {
             status->decode = false;

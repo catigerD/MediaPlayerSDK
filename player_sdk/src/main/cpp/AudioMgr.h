@@ -19,6 +19,7 @@ extern "C" {
 #include "AndroidLog.h"
 #include <assert.h>
 #include "CallJavaMgr.h"
+#include "Common.h"
 
 class AudioMgr {
 private:
@@ -31,9 +32,6 @@ private:
 
     //音频属性
     int64_t duration;
-
-    //当前播放时间
-    int clock = 0;
 
     //decode相关
     pthread_t startTid;
@@ -80,16 +78,20 @@ private:
     void callJavaTimeInfo(int cur, int total);
 
 public:
-    AudioMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, AVStream *stream, int index, int64_t duration);
+    AudioMgr(CallJavaMgr *callJavaMgr, MediaStatus *status, int index, AVStream *stream, int64_t duration);
 
     ~AudioMgr();
 
     MediaStatus *status;
-    PacketQueue *pktQueue;
-
-    int streamIndex;
     AVStream *stream = nullptr;
+
+    PacketQueue *pktQueue;
+    int streamIndex;
     AVCodecContext *codecContext = nullptr;
+    //当前播放时间
+    int clock = 0;
+    //减少 java 层调用间隔
+    int last_clock = 0;
 
     void start();
 

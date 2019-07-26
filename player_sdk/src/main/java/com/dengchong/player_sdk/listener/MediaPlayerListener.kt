@@ -3,6 +3,7 @@ package com.dengchong.player_sdk.listener
 import android.os.Handler
 import android.os.Looper
 import com.dengchong.player_sdk.utils.ALog
+import com.dengchong.player_sdk.utils.AThread
 
 interface MediaPlayerListener {
     fun onPrepared()
@@ -29,25 +30,27 @@ open class LogMediaPlayerListener : MediaPlayerListener {
 
 class UIMediaPlayerListener(private val mediaPlayerListener: MediaPlayerListener?) {
 
-    private val handler by lazy {
-        Handler(Looper.getMainLooper())
-    }
-
     fun onPrepared() {
-        handler.post {
-            mediaPlayerListener?.onPrepared()
+        mediaPlayerListener?.apply {
+            AThread.runOnUiThread {
+                onPrepared()
+            }
         }
     }
 
     fun onCompleted() {
-        handler.post {
-            mediaPlayerListener?.onCompleted()
+        mediaPlayerListener?.apply {
+            AThread.runOnUiThread {
+                onCompleted()
+            }
         }
     }
 
     fun onTimeInfo(cur: Int, total: Int) {
-        handler.post {
-            mediaPlayerListener?.onTimeInfo(cur, total)
+        mediaPlayerListener?.apply {
+            AThread.runOnUiThread {
+                onTimeInfo(cur, total)
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.dengchong.player_sdk
 
 import com.dengchong.player_sdk.listener.MediaPlayerListener
 import com.dengchong.player_sdk.listener.UIMediaPlayerListener
+import com.dengchong.player_sdk.utils.AThread
 
 object MediaPlayer {
 
@@ -27,23 +28,39 @@ object MediaPlayer {
         }
 
     fun prepare(url: String) {
-        n_prepare(url)
+        AThread.runOnWorkThread {
+            n_prepare(url)
+        }
     }
 
     fun start() {
-        n_start()
+        AThread.runOnWorkThread {
+            n_start()
+        }
     }
 
     fun stop() {
-        n_stop()
+        AThread.runOnWorkThread {
+            n_stop()
+        }
     }
 
     fun pause() {
-        n_pause()
+        AThread.runOnWorkThread {
+            n_pause()
+        }
     }
 
     fun resume() {
-        n_resume()
+        AThread.runOnWorkThread {
+            n_resume()
+        }
+    }
+
+    fun seek(time: Int) {
+        AThread.runOnUiThread {
+            n_seek(time)
+        }
     }
 
     private fun callPrepared() {
@@ -69,4 +86,6 @@ object MediaPlayer {
     private external fun n_pause()
 
     private external fun n_resume()
+
+    private external fun n_seek(time: Int)
 }

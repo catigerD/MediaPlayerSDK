@@ -26,6 +26,8 @@ private:
 
     friend void *readPacket(void *data);
 
+    friend void *prepareThread(void *data);
+
 private:
     string url;
     AVFormatContext *formatContext = nullptr;
@@ -39,8 +41,12 @@ private:
     MediaStatus status;
 
     pthread_t readPktTid;
+    pthread_t prepareTid;
 
     void prepareFfmpeg();
+
+    //seek
+    pthread_mutex_t seek_mutex;
 
 public:
     MediaPlayer(CallJavaMgr *callJavaMgr);
@@ -56,7 +62,10 @@ public:
     void pause();
 
     void resume();
+
+    void seek(int time);
 };
 
+void *prepareThread(void *data);
 
 #endif //MEDIAPLAYERSDK_MEDIAPLAYER_H

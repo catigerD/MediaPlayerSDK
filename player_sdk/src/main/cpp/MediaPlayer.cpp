@@ -6,16 +6,26 @@
 
 MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
         callJavaMgr(callJavaMg) {
+    pthread_mutex_init(&seek_mutex, nullptr);
 }
 
 MediaPlayer::~MediaPlayer() {
     delete audioMgr;
+    audioMgr = nullptr;
+
+    pthread_mutex_destroy(&seek_mutex);
     callJavaMgr = nullptr;
 }
 
 void MediaPlayer::prepare(const string urlParam) {
     url = urlParam;
-    prepareFfmpeg();
+    pthread_create(&prepareTid, nullptr, prepareThread, this);
+}
+
+void *prepareThread(void *data) {
+    MediaPlayer *mediaPlayer = static_cast<MediaPlayer *>(data);
+    mediaPlayer->prepareFfmpeg();
+    pthread_exit(&mediaPlayer->prepareTid);
 }
 
 void MediaPlayer::prepareFfmpeg() {
@@ -46,7 +56,7 @@ void MediaPlayer::prepareFfmpeg() {
 
     for (int i = 0; i < formatContext->nb_streams; i++) {
         if (AVMEDIA_TYPE_AUDIO == formatContext->streams[i]->codecpar->codec_type) {
-            audioMgr = new AudioMgr(&status, callJavaMgr, formatContext->streams[i], i,
+            audioMgr = new AudioMgr(callJavaMgr, &status, i, formatContext->streams[i],
                                     formatContext->duration / AV_TIME_BASE);
             break;
         }
@@ -79,7 +89,7 @@ void MediaPlayer::prepareFfmpeg() {
         LOGE("avcodec_open2() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
     }
 
-    callJavaMgr->callPrepared(THREAD_MAIN);
+    callJavaMgr->callPrepared(THREAD_CHILD);
     LOGI("准备好了！！！");
 }
 
@@ -95,13 +105,19 @@ void *readPacket(void *data) {
     mediaPlayer->audioMgr->start();
 
     while (!mediaPlayer->status.exit) {
+        if (mediaPlayer->status.seek) {
+            sleep();
+            continue;
+        }
         mediaPlayer->status.read = true;
         if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE) {
             sleep();
             continue;
         }
         AVPacket *packet = av_packet_alloc();
+        pthread_mutex_lock(&mediaPlayer->seek_mutex);
         ret = av_read_frame(mediaPlayer->formatContext, packet);
+        pthread_mutex_unlock(&mediaPlayer->seek_mutex);
         if (ret == 0) {
             if (packet->stream_index == mediaPlayer->audioMgr->streamIndex) {
                 mediaPlayer->audioMgr->pktQueue->putAVPacket(packet);
@@ -157,6 +173,29 @@ void MediaPlayer::pause() {
 void MediaPlayer::resume() {
     if (audioMgr != nullptr) {
         audioMgr->resume();
+    }
+}
+
+//耗时，需要子线程中调用
+void MediaPlayer::seek(int time) {
+    if (formatContext->duration < 0) {
+        //直播流
+        return;
+    }
+    if (time < 0 || time > formatContext->duration) {
+        return;
+    }
+    if (audioMgr != nullptr) {
+        status.seek = true;
+        audioMgr->pktQueue->clearAVPacket();
+        audioMgr->clock = 0;
+        audioMgr->last_clock = 0;
+        int64_t rel = time * AV_TIME_BASE;
+        pthread_mutex_lock(&seek_mutex);
+        avformat_seek_file(formatContext, audioMgr->streamIndex, INT64_MIN, rel, INT64_MAX, 0);
+        avcodec_flush_buffers(audioMgr->codecContext);
+        pthread_mutex_unlock(&seek_mutex);
+        status.seek = false;
     }
 }
 

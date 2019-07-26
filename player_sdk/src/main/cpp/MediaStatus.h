@@ -15,6 +15,8 @@ public:
     bool read = false;
 
     bool decode = false;
+
+    bool seek = false;
 };
 
 
