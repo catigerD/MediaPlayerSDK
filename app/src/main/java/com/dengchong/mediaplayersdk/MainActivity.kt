@@ -1,6 +1,7 @@
 package com.dengchong.mediaplayersdk
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -8,8 +9,8 @@ import android.os.Environment
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.dengchong.player_sdk.MediaPlayer
-import com.dengchong.player_sdk.listener.MediaPlayerListener
-import com.dengchong.player_sdk.utils.ALog
+import com.dengchong.player_sdk.listener.LogMediaPlayerListener
+import com.dengchong.player_sdk.utils.secdsToDateFormat
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
@@ -33,16 +34,16 @@ class MainActivity : AppCompatActivity() {
             MediaPlayer.resume()
         }
 
-        MediaPlayer.listener = object : MediaPlayerListener {
+        MediaPlayer.listener = object : LogMediaPlayerListener() {
             override fun onPrepared() {
                 super.onPrepared()
                 MediaPlayer.start()
-                ALog.d("已经准备好了！！！")
             }
 
-            override fun onCompleted() {
-                super.onCompleted()
-                ALog.d("已经播放完成了！！！")
+            @SuppressLint("SetTextI18n")
+            override fun onTimeInfo(cur: Int, total: Int) {
+                super.onTimeInfo(cur, total)
+                tv_time.text = "${cur.secdsToDateFormat()}/${total.secdsToDateFormat()}"
             }
         }
     }

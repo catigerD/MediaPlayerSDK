@@ -4,46 +4,29 @@
 
 #include "AudioMgr.h"
 
-AudioMgr::AudioMgr(MediaStatus *status, AVStream *stream) :
+AudioMgr::AudioMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, AVStream *stream, int index, int64_t duration) :
         status(status),
-        stream(stream) {
+        callJavaMgr(callJavaMgr),
+        stream(stream),
+        streamIndex(index),
+        duration(duration) {
     pktQueue = new PacketQueue(status);
     sample_rate = stream->codecpar->sample_rate;
     swrBuf = new uint8_t[sample_rate * 2 * 2];
 }
 
 AudioMgr::~AudioMgr() {
+    destroyOpenSLES();
+    avcodec_close(codecContext);
+    avcodec_free_context(&codecContext);
+
     delete[] swrBuf;
     delete pktQueue;
     releaseDecodeRes();
-    avcodec_close(codecContext);
-    avcodec_free_context(&codecContext);
-    destroyOpenSLES();
-}
 
-void *startThread(void *data) {
-    AudioMgr *audioMgr = static_cast<AudioMgr *>(data);
-    audioMgr->initOpenSLESEnv();
-    pthread_exit(&audioMgr->startTid);
-}
-
-void AudioMgr::start() {
-    pthread_create(&startTid, nullptr, startThread, this);
-}
-
-void pcmSimpleBufferQueueCallback(
-        SLAndroidSimpleBufferQueueItf caller,
-        void *pContext
-) {
-    AudioMgr *audioMgr = static_cast<AudioMgr *>(pContext);
-    uint8_t *data = nullptr;
-    int size = 0;
-    int ret = audioMgr->decode(&data, &size);
-    LOGI("pcmSimpleBufferQueueCallback: size : %d", size);
-    if (ret == 0) {
-        (*audioMgr->androidSimpleBufferQueueItf)->Enqueue(
-                audioMgr->androidSimpleBufferQueueItf, data, static_cast<SLuint32>(size));
-    }
+    stream = nullptr;
+    callJavaMgr = nullptr;
+    status = nullptr;
 }
 
 void AudioMgr::initOpenSLESEnv() {
@@ -172,9 +155,42 @@ void AudioMgr::destroyOpenSLES() {
     }
 }
 
+void *startThread(void *data) {
+    AudioMgr *audioMgr = static_cast<AudioMgr *>(data);
+    audioMgr->initOpenSLESEnv();
+    pthread_exit(&audioMgr->startTid);
+}
+
+void AudioMgr::start() {
+    pthread_create(&startTid, nullptr, startThread, this);
+}
+
+void AudioMgr::callJavaTimeInfo(int cur, int total) {
+    if (callJavaMgr != nullptr) {
+        callJavaMgr->callTimeInfo(THREAD_CHILD, cur, total);
+    }
+}
+
+void pcmSimpleBufferQueueCallback(
+        SLAndroidSimpleBufferQueueItf caller,
+        void *pContext
+) {
+    AudioMgr *audioMgr = static_cast<AudioMgr *>(pContext);
+    uint8_t *data = nullptr;
+    int size = 0;
+    int ret = audioMgr->decode(&data, &size);
+    LOGI("pcmSimpleBufferQueueCallback: size : %d", size);
+    if (ret == 0) {
+        audioMgr->clock += size / (double) (audioMgr->sample_rate * 2 * 2);
+        audioMgr->callJavaTimeInfo(audioMgr->clock, static_cast<int>(audioMgr->duration));
+        (*audioMgr->androidSimpleBufferQueueItf)->Enqueue(
+                audioMgr->androidSimpleBufferQueueItf, data, static_cast<SLuint32>(size));
+    }
+}
+
 int AudioMgr::decode(uint8_t **outputBuf, int *size) {
     int ret = 0;
-    while (!status->exit) {
+    while (status != nullptr && !status->exit) {
         status->decode = true;
         if (pktQueue->size() <= 0) {
             status->decode = false;
@@ -230,16 +246,20 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
             status->decode = false;
             continue;
         }
-
         decodeAPacketFinish = false;
         *size = swr_convert(swrContext,
                             &swrBuf,
                             frame->nb_samples,
                             reinterpret_cast<const uint8_t **>(&frame->data),
                             frame->nb_samples);
-
         *outputBuf = swrBuf;
         *size *= 4;
+
+        int cur_time = static_cast<int>(frame->pts * av_q2d(stream->time_base));
+        if (cur_time < clock) {
+            cur_time = clock;
+        }
+        clock = cur_time;
 
         releaseDecodeRes();
         status->decode = false;

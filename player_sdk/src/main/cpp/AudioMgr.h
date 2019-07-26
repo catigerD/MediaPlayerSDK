@@ -18,6 +18,7 @@ extern "C" {
 #include "MediaStatus.h"
 #include "AndroidLog.h"
 #include <assert.h>
+#include "CallJavaMgr.h"
 
 class AudioMgr {
 private:
@@ -27,6 +28,12 @@ private:
             SLAndroidSimpleBufferQueueItf caller,
             void *pContext
     );
+
+    //音频属性
+    int64_t duration;
+
+    //当前播放时间
+    int clock = 0;
 
     //decode相关
     pthread_t startTid;
@@ -60,21 +67,27 @@ private:
     AVPacket *packet = nullptr;
     AVFrame *frame = nullptr;
     SwrContext *swrContext = nullptr;
+
     void releaseDecodeRes();
 
     int decode(uint8_t **outputBuf, int *size);
 
     SLuint32 getCurrentSimpleRate();
 
+    //回调 java 层
+    CallJavaMgr *callJavaMgr;
+
+    void callJavaTimeInfo(int cur, int total);
+
 public:
-    AudioMgr(MediaStatus *status, AVStream *stream);
+    AudioMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, AVStream *stream, int index, int64_t duration);
 
     ~AudioMgr();
 
     MediaStatus *status;
     PacketQueue *pktQueue;
 
-    int streamIndex = -1;
+    int streamIndex;
     AVStream *stream = nullptr;
     AVCodecContext *codecContext = nullptr;
 
@@ -86,6 +99,11 @@ public:
 
     void resume();
 };
+
+void pcmSimpleBufferQueueCallback(
+        SLAndroidSimpleBufferQueueItf caller,
+        void *pContext
+);
 
 
 #endif //MEDIAPLAYERSDK_AUDIOMGR_H

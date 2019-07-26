@@ -10,6 +10,7 @@ MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
 
 MediaPlayer::~MediaPlayer() {
     delete audioMgr;
+    callJavaMgr = nullptr;
 }
 
 void MediaPlayer::prepare(const string urlParam) {
@@ -45,13 +46,13 @@ void MediaPlayer::prepareFfmpeg() {
 
     for (int i = 0; i < formatContext->nb_streams; i++) {
         if (AVMEDIA_TYPE_AUDIO == formatContext->streams[i]->codecpar->codec_type) {
-            audioMgr = new AudioMgr(&status, formatContext->streams[i]);
-            audioMgr->streamIndex = i;
+            audioMgr = new AudioMgr(&status, callJavaMgr, formatContext->streams[i], i,
+                                    formatContext->duration / AV_TIME_BASE);
             break;
         }
     }
 
-    if (audioMgr->streamIndex < 0) {
+    if (audioMgr == nullptr) {
         LOGE("audioMgr.streamIndex < 0 for url : %s", url.c_str());
         return;
     }

@@ -1,6 +1,7 @@
 package com.dengchong.player_sdk
 
 import com.dengchong.player_sdk.listener.MediaPlayerListener
+import com.dengchong.player_sdk.listener.UIMediaPlayerListener
 
 object MediaPlayer {
 
@@ -18,7 +19,12 @@ object MediaPlayer {
         n_initJVM();
     }
 
+    private var uiListener: UIMediaPlayerListener? = null
     var listener: MediaPlayerListener? = null
+        set(value) {
+            field = value
+            uiListener = UIMediaPlayerListener(listener)
+        }
 
     fun prepare(url: String) {
         n_prepare(url)
@@ -41,11 +47,15 @@ object MediaPlayer {
     }
 
     private fun callPrepared() {
-        listener?.onPrepared()
+        uiListener?.onPrepared()
     }
 
     private fun callCompleted() {
-        listener?.onCompleted()
+        uiListener?.onCompleted()
+    }
+
+    private fun callTimeInfo(cur: Int, total: Int) {
+        uiListener?.onTimeInfo(cur, total)
     }
 
     private external fun n_initJVM()

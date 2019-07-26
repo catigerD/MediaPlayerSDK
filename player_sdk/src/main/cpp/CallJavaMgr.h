@@ -21,6 +21,7 @@ private:
 
     jmethodID mid_prepared = nullptr;
     jmethodID mid_completed = nullptr;
+    jmethodID mid_time_info = nullptr;
 
 public:
     CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo);
@@ -31,6 +32,8 @@ public:
     void callPrepared(ThreadType type);
 
     void callCompleted(ThreadType type);
+
+    void callTimeInfo(ThreadType type, int cur, int total);
 };
 
 
