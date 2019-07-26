@@ -32,6 +32,14 @@ object MediaPlayer {
         n_stop()
     }
 
+    fun pause() {
+        n_pause()
+    }
+
+    fun resume() {
+        n_resume()
+    }
+
     private fun callPrepared() {
         listener?.onPrepared()
     }
@@ -47,4 +55,8 @@ object MediaPlayer {
     private external fun n_start()
 
     private external fun n_stop()
+
+    private external fun n_pause()
+
+    private external fun n_resume()
 }

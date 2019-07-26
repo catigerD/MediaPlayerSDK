@@ -147,4 +147,16 @@ void MediaPlayer::stop() {
     sleep();
 }
 
+void MediaPlayer::pause() {
+    if (audioMgr != nullptr) {
+        audioMgr->pause();
+    }
+}
+
+void MediaPlayer::resume() {
+    if (audioMgr != nullptr) {
+        audioMgr->resume();
+    }
+}
+
 

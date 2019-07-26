@@ -60,3 +60,19 @@ Java_com_dengchong_player_1sdk_MediaPlayer_n_1stop(JNIEnv *env, jobject instance
         mediaPlayer = nullptr;
     }
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_dengchong_player_1sdk_MediaPlayer_n_1pause(JNIEnv *env, jobject instance) {
+    if (mediaPlayer != nullptr) {
+        mediaPlayer->pause();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_dengchong_player_1sdk_MediaPlayer_n_1resume(JNIEnv *env, jobject instance) {
+    if (mediaPlayer != nullptr) {
+        mediaPlayer->resume();
+    }
+}

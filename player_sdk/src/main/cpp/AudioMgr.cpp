@@ -313,3 +313,15 @@ void AudioMgr::stop() {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_STOPPED);
     }
 }
+
+void AudioMgr::pause() {
+    if (playItf != nullptr) {
+        (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PAUSED);
+    }
+}
+
+void AudioMgr::resume() {
+    if (playItf != nullptr) {
+        (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PLAYING);
+    }
+}

@@ -26,6 +26,12 @@ class MainActivity : AppCompatActivity() {
         btn_stop.setOnClickListener {
             MediaPlayer.stop()
         }
+        btn_pause.setOnClickListener {
+            MediaPlayer.pause()
+        }
+        btn_resume.setOnClickListener {
+            MediaPlayer.resume()
+        }
 
         MediaPlayer.listener = object : MediaPlayerListener {
             override fun onPrepared() {

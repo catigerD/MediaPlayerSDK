@@ -52,6 +52,10 @@ public:
     void start();
 
     void stop();
+
+    void pause();
+
+    void resume();
 };
 
 
