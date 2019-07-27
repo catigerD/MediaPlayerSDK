@@ -53,6 +53,8 @@ public:
 
     ~MediaPlayer();
 
+    int duration = -1;
+
     void prepare(const string urlParam);
 
     void start();

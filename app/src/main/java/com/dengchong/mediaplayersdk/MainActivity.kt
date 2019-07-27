@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
+import android.widget.SeekBar
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.dengchong.player_sdk.MediaPlayer
@@ -15,6 +16,7 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
 
+    private var seeking = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +35,24 @@ class MainActivity : AppCompatActivity() {
         btn_resume.setOnClickListener {
             MediaPlayer.resume()
         }
+        sb_time.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (seeking) {
+                    MediaPlayer.apply {
+                        seek(duration() * progress / 100)
+                    }
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                seeking = true
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                seeking = false
+            }
+
+        })
 
         MediaPlayer.listener = object : LogMediaPlayerListener() {
             override fun onPrepared() {
@@ -43,6 +63,9 @@ class MainActivity : AppCompatActivity() {
             @SuppressLint("SetTextI18n")
             override fun onTimeInfo(cur: Int, total: Int) {
                 super.onTimeInfo(cur, total)
+                if (!seeking) {
+                    sb_time.progress = if (total == 0) 0 else cur * 100 / (total)
+                }
                 tv_time.text = "${cur.secdsToDateFormat()}/${total.secdsToDateFormat()}"
             }
         }

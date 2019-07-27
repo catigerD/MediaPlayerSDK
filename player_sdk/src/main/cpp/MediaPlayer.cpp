@@ -56,8 +56,10 @@ void MediaPlayer::prepareFfmpeg() {
 
     for (int i = 0; i < formatContext->nb_streams; i++) {
         if (AVMEDIA_TYPE_AUDIO == formatContext->streams[i]->codecpar->codec_type) {
+            duration = formatContext->duration / AV_TIME_BASE;
             audioMgr = new AudioMgr(callJavaMgr, &status, i, formatContext->streams[i],
                                     formatContext->duration / AV_TIME_BASE);
+
             break;
         }
     }
@@ -182,18 +184,22 @@ void MediaPlayer::seek(int time) {
         //直播流
         return;
     }
-    if (time < 0 || time > formatContext->duration) {
+    if (time < 0 || time > formatContext->duration / AV_TIME_BASE) {
         return;
     }
-    if (audioMgr != nullptr) {
+    if (audioMgr == nullptr) {
+        return;
+    }
+    if (!status.seek) {
         status.seek = true;
         audioMgr->pktQueue->clearAVPacket();
         audioMgr->clock = 0;
         audioMgr->last_clock = 0;
         int64_t rel = time * AV_TIME_BASE;
         pthread_mutex_lock(&seek_mutex);
-        avformat_seek_file(formatContext, audioMgr->streamIndex, INT64_MIN, rel, INT64_MAX, 0);
         avcodec_flush_buffers(audioMgr->codecContext);
+//        avformat_seek_file(formatContext, audioMgr->streamIndex, INT64_MIN, rel, INT64_MAX, 0);
+        avformat_seek_file(formatContext, -1, INT64_MIN, rel, INT64_MAX, 0);
         pthread_mutex_unlock(&seek_mutex);
         status.seek = false;
     }

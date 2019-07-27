@@ -84,3 +84,12 @@ Java_com_dengchong_player_1sdk_MediaPlayer_n_1seek(JNIEnv *env, jobject instance
         mediaPlayer->seek(time);
     }
 }
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_dengchong_player_1sdk_MediaPlayer_n_1duration(JNIEnv *env, jobject instance) {
+    if (mediaPlayer != nullptr) {
+        return mediaPlayer->duration;
+    }
+    return -1;
+}

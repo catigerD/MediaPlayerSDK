@@ -20,12 +20,18 @@ object MediaPlayer {
         n_initJVM();
     }
 
+    private var duration = -1;
+
     private var uiListener: UIMediaPlayerListener? = null
     var listener: MediaPlayerListener? = null
         set(value) {
             field = value
             uiListener = UIMediaPlayerListener(listener)
         }
+
+    private fun releaseRes() {
+        duration = -1;
+    }
 
     fun prepare(url: String) {
         AThread.runOnWorkThread {
@@ -40,6 +46,8 @@ object MediaPlayer {
     }
 
     fun stop() {
+        callTimeInfo(0, 0)
+        releaseRes()
         AThread.runOnWorkThread {
             n_stop()
         }
@@ -61,6 +69,13 @@ object MediaPlayer {
         AThread.runOnUiThread {
             n_seek(time)
         }
+    }
+
+    fun duration(): Int {
+        if (duration > 0) {
+            return duration;
+        }
+        return n_duration()
     }
 
     private fun callPrepared() {
@@ -88,4 +103,6 @@ object MediaPlayer {
     private external fun n_resume()
 
     private external fun n_seek(time: Int)
+
+    private external fun n_duration(): Int
 }

@@ -48,7 +48,7 @@ queue<AVPacket *>::size_type PacketQueue::size() {
 void PacketQueue::clearAVPacket() {
     pthread_cond_signal(&cond);
     pthread_mutex_lock(&mutex);
-    for (int i = 0; i < pktQueue.size(); i++) {
+    while (!pktQueue.empty()) {
         AVPacket *packet = pktQueue.front();
         pktQueue.pop();
         av_packet_free(&packet);
