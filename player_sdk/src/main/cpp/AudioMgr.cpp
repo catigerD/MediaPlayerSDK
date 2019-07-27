@@ -167,7 +167,7 @@ void AudioMgr::start() {
 
 void AudioMgr::callJavaTimeInfo(int cur, int total) {
     if (callJavaMgr != nullptr) {
-        callJavaMgr->callTimeInfo(THREAD_CHILD, cur, total);
+        callJavaMgr->callTimeInfo(cur, total);
     }
 }
 

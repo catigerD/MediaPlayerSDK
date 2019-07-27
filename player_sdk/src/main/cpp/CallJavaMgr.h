@@ -29,11 +29,11 @@ public:
     ~CallJavaMgr();
 
     //todo 使用可变参数优化代码？
-    void callPrepared(ThreadType type);
+    void callPrepared();
 
-    void callCompleted(ThreadType type);
+    void callCompleted();
 
-    void callTimeInfo(ThreadType type, int cur, int total);
+    void callTimeInfo(int cur, int total);
 };
 
 

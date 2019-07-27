@@ -89,7 +89,7 @@ void MediaPlayer::prepareFfmpeg() {
         LOGE("avcodec_open2() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
     }
 
-    callJavaMgr->callPrepared(THREAD_CHILD);
+    callJavaMgr->callPrepared();
     LOGI("准备好了！！！");
 }
 
@@ -141,7 +141,7 @@ void *readPacket(void *data) {
     }
 
     LOGI("读取完成----------");
-    mediaPlayer->callJavaMgr->callCompleted(THREAD_CHILD);
+    mediaPlayer->callJavaMgr->callCompleted();
 
     mediaPlayer->status.read = false;
     pthread_exit(&mediaPlayer->readPktTid);
