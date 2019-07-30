@@ -7,12 +7,16 @@
 
 extern "C" {
 #include "libavcodec/avcodec.h"
+#include "libswscale/swscale.h"
+#include "libavutil/imgutils.h"
 };
 
 #include "MediaStatus.h"
 #include "PacketQueue.h"
 #include "Common.h"
 #include "AndroidLog.h"
+#include "FrameQueue.h"
+#include <array>
 
 class VideoMgr {
 
@@ -47,10 +51,28 @@ public:
         return packetQueue.size();
     }
 
+    void clearFrame() {
+        frameQueue.clearFrame();
+    }
+
 private:
+    static const unsigned MAX_FRAME_SIZE;
+
     friend void *startVideoThread(void *);
 
     void decode();
+
+    bool needScale(AVFrame *frame) {
+        return AV_PIX_FMT_YUV420P == frame->format;
+    }
+
+    bool scaleYUV(AVFrame *inFrame, AVFrame **outFrame);
+
+    void startPlay();
+
+    friend void *playThread(void *data);
+
+    void play();
 
 private:
     MediaStatus *mediaStatus;
@@ -61,9 +83,14 @@ private:
     AVCodecContext *codecContext;
 
     pthread_t startTid;
+    FrameQueue frameQueue;
+
+    pthread_t playTid;
 };
 
 void *startVideoThread(void *);
+
+void *playThread(void *data);
 
 
 #endif //MEDIAPLAYERSDK_VIDEOMGR_H

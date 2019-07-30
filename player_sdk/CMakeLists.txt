@@ -4,6 +4,7 @@ add_compile_options(-Wall)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp)
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/common)
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/main/cpp CPP_DIR)
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/main/cpp/common COMMON_DIR)
 

@@ -226,9 +226,13 @@ void MediaPlayer::seek(int time) {
     if (audioMgr == nullptr) {
         return;
     }
+    if (videoMgr == nullptr) {
+        return;
+    }
     if (!status.seek) {
         status.seek = true;
         audioMgr->pktQueue->clearAVPacket();
+        videoMgr.operator*().clearFrame();
         audioMgr->clock = 0;
         audioMgr->last_clock = 0;
         int64_t rel = time * AV_TIME_BASE;

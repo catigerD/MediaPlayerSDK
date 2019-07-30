@@ -3,3 +3,12 @@
 //
 
 #include "Lock.h"
+
+Lock::Lock(pthread_mutex_t *mutex)
+        : mutex(mutex) {
+    pthread_mutex_lock(mutex);
+}
+
+Lock::~Lock() {
+    pthread_mutex_unlock(mutex);
+}

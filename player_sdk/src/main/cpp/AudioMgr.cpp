@@ -128,7 +128,7 @@ void AudioMgr::createBufferQueueAudioPlayer() {
     assert(SL_RESULT_SUCCESS == result);
     (void) result;
 
-    // get the play interface
+    // get the startPlay interface
     result = (*playObject)->GetInterface(playObject, SL_IID_PLAY, &playItf);
     assert(SL_RESULT_SUCCESS == result);
     (void) result;
