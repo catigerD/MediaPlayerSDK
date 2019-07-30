@@ -24,7 +24,7 @@ class MainActivity : AppCompatActivity() {
         reqPermissions()
         // Example of a call to a native method
         btn_prepare.setOnClickListener {
-            MediaPlayer.prepare(MUSIC_1)
+            MediaPlayer.prepare(MUSIC_LOCAL_1)
         }
         btn_stop.setOnClickListener {
             MediaPlayer.stop()

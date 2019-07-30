@@ -4,8 +4,14 @@
 
 #include "MediaPlayer.h"
 
+const unsigned MediaPlayer::MAX_PACKET_SIZE = 100;
+
 MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
-        callJavaMgr(callJavaMg) {
+        status(),
+        callJavaMgr(callJavaMg),
+        formatContext(nullptr),
+        audioMgr(nullptr),
+        videoMgr(nullptr) {
     pthread_mutex_init(&seek_mutex, nullptr);
 }
 
@@ -60,7 +66,8 @@ void MediaPlayer::prepareFfmpeg() {
             audioMgr = new AudioMgr(callJavaMgr, &status, i, formatContext->streams[i],
                                     formatContext->duration / AV_TIME_BASE);
 
-            break;
+        } else if (AVMEDIA_TYPE_VIDEO == formatContext->streams[i]->codecpar->codec_type) {
+            videoMgr = make_shared<VideoMgr>(&status, i, formatContext->streams[i]->codecpar);
         }
     }
 
@@ -69,30 +76,53 @@ void MediaPlayer::prepareFfmpeg() {
         return;
     }
 
+    if (videoMgr == nullptr) {
+        LOGE("videoMgr.streamIndex < 0 for url : %s", url.c_str());
+        return;
+    }
+
     //4.获取解码器并打开
-    AVCodec *codec = avcodec_find_decoder(audioMgr->stream->codecpar->codec_id);
+    ret = openCodec(audioMgr->stream->codecpar, &audioMgr->codecContext);
+    if (ret != 0) {
+        LOGE("openCodec audio fail for url : %s", url.c_str());
+        return;
+    }
+    AVCodecContext *vCodecContext = nullptr;
+    ret = openCodec((*videoMgr).getCodecParameters(), &vCodecContext);
+    if (ret != 0) {
+        LOGE("openCodec video fail for url : %s", url.c_str());
+        return;
+    }
+    (*videoMgr).setCodecContext(vCodecContext);
+
+    callJavaMgr->callPrepared();
+    LOGI("准备好了！！！");
+}
+
+int MediaPlayer::openCodec(AVCodecParameters *avCodecParameters, AVCodecContext **avCodecContext) {
+    AVCodec *codec = avcodec_find_decoder(avCodecParameters->codec_id);
     if (codec == nullptr) {
         LOGE("avcodec_find_decoder() fail for url : %s", url.c_str());
-        return;
+        return -1;
     }
     AVCodecContext *codecContext = avcodec_alloc_context3(codec);
     if (codecContext == nullptr) {
         LOGE("avcodec_alloc_context3() fail for url : %s", url.c_str());
-        return;
+        return -1;
     }
-    ret = avcodec_parameters_to_context(codecContext, audioMgr->stream->codecpar);
+    int ret = 0;
+    ret = avcodec_parameters_to_context(codecContext, avCodecParameters);
     if (ret < 0) {
         LOGE("avcodec_parameters_to_context() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
-        return;
+        return -1;
     }
-    audioMgr->codecContext = codecContext;
+    *avCodecContext = codecContext;
     ret = avcodec_open2(codecContext, codec, nullptr);
     if (ret != 0) {
         LOGE("avcodec_open2() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
+        return -1;
     }
-
-    callJavaMgr->callPrepared();
-    LOGI("准备好了！！！");
+    return 0;
 }
 
 void *readPacket(void *data) {
@@ -104,7 +134,9 @@ void *readPacket(void *data) {
 
     int ret = 0;
     int count = 0;
+    int vcount = 0;
     mediaPlayer->audioMgr->start();
+    mediaPlayer->videoMgr.operator*().start();
 
     while (!mediaPlayer->status.exit) {
         if (mediaPlayer->status.seek) {
@@ -112,7 +144,8 @@ void *readPacket(void *data) {
             continue;
         }
         mediaPlayer->status.read = true;
-        if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE) {
+        if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE
+            || mediaPlayer->videoMgr.operator*().getSize() > mediaPlayer->MAX_PACKET_SIZE) {
             sleep();
             continue;
         }
@@ -123,7 +156,10 @@ void *readPacket(void *data) {
         if (ret == 0) {
             if (packet->stream_index == mediaPlayer->audioMgr->streamIndex) {
                 mediaPlayer->audioMgr->pktQueue->putAVPacket(packet);
-                LOGI("读取第 %d 帧包", count++);
+                LOGI("a --- 读取第 %d 帧包", count++);
+            } else if (packet->stream_index == mediaPlayer->videoMgr.operator*().getIndex()) {
+                mediaPlayer->videoMgr.operator*().putPacket(packet);
+                LOGI("v --- 读取第 %d 帧包", vcount++);
             } else {
                 av_packet_free(&packet);
                 av_free(packet);

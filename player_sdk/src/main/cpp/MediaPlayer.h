@@ -17,37 +17,12 @@ extern "C" {
 #include "PacketQueue.h"
 #include "AndroidLog.h"
 #include "Common.h"
+#include "VideoMgr.h"
+#include <memory>
 
 using namespace std;
 
 class MediaPlayer {
-private:
-    const unsigned MAX_PACKET_SIZE = 100;
-
-    friend void *readPacket(void *data);
-
-    friend void *prepareThread(void *data);
-
-private:
-    string url;
-    AVFormatContext *formatContext = nullptr;
-
-    //回调 java 层
-    CallJavaMgr *callJavaMgr = nullptr;
-
-    //audio相关
-    AudioMgr *audioMgr;
-
-    MediaStatus status;
-
-    pthread_t readPktTid;
-    pthread_t prepareTid;
-
-    void prepareFfmpeg();
-
-    //seek
-    pthread_mutex_t seek_mutex;
-
 public:
     MediaPlayer(CallJavaMgr *callJavaMgr);
 
@@ -66,6 +41,35 @@ public:
     void resume();
 
     void seek(int time);
+
+    static const unsigned MAX_PACKET_SIZE;
+
+private:
+
+    friend void *readPacket(void *data);
+
+    friend void *prepareThread(void *data);
+
+    int openCodec(AVCodecParameters *avCodecParameters, AVCodecContext **avCodecContext);
+
+    void prepareFfmpeg();
+
+private:
+
+    MediaStatus status;
+    //回调 java 层
+    CallJavaMgr *callJavaMgr;
+
+    string url;
+    AVFormatContext *formatContext;
+    //audio相关
+    AudioMgr *audioMgr;
+    shared_ptr<VideoMgr> videoMgr;
+
+    pthread_t readPktTid;
+    pthread_t prepareTid;
+    //seek
+    pthread_mutex_t seek_mutex;
 };
 
 void *prepareThread(void *data);

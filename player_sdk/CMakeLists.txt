@@ -5,6 +5,7 @@ add_compile_options(-Wall)
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp)
 include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp/include)
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/main/cpp CPP_DIR)
+aux_source_directory(${CMAKE_SOURCE_DIR}/src/main/cpp/common COMMON_DIR)
 
 add_library( # Sets the name of the library.
         media-player
@@ -13,7 +14,8 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        ${CPP_DIR})
+        ${CPP_DIR}
+        ${COMMON_DIR})
 
 add_library(avcodec-57 SHARED IMPORTED)
 set_target_properties(avcodec-57
