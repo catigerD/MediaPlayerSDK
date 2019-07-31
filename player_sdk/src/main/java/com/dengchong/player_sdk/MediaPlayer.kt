@@ -2,6 +2,7 @@ package com.dengchong.player_sdk
 
 import com.dengchong.player_sdk.listener.MediaPlayerListener
 import com.dengchong.player_sdk.listener.UIMediaPlayerListener
+import com.dengchong.player_sdk.render.MediaSurfaceView
 import com.dengchong.player_sdk.utils.AThread
 
 object MediaPlayer {
@@ -28,6 +29,7 @@ object MediaPlayer {
             field = value
             uiListener = UIMediaPlayerListener(listener)
         }
+    var mediaSurfaceView: MediaSurfaceView? = null
 
     private fun releaseRes() {
         duration = -1;
@@ -88,6 +90,10 @@ object MediaPlayer {
 
     private fun callTimeInfo(cur: Int, total: Int) {
         uiListener?.onTimeInfo(cur, total)
+    }
+
+    private fun callRender(width: Int, height: Int, y: ByteArray, u: ByteArray, v: ByteArray) {
+        mediaSurfaceView?.render(width, height, y, u, v)
     }
 
     private external fun n_initJVM()

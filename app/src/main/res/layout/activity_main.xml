@@ -6,6 +6,11 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+    <com.dengchong.player_sdk.render.MediaSurfaceView
+            android:id="@+id/sv_render"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"/>
+
     <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
