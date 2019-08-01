@@ -1,22 +1,37 @@
 package com.dengchong.player_sdk.render
 
-import android.content.Context
 import android.opengl.GLES30
-import androidx.annotation.RawRes
 import com.dengchong.player_sdk.utils.ALog
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.lang.StringBuilder
 
-fun Context.getShaderSource(@RawRes idRes: Int): String {
-    val result = StringBuilder()
-    val inputStream = resources.openRawResource(idRes)
-    val reader = BufferedReader(InputStreamReader(inputStream))
-    while (reader.readLine().also { result.append(it).append('\n') } != null) {
+const val VERTEX_SHADER = "" +
+        "attribute vec4 position;\n" +
+        "attribute vec2 texcoords;\n" +
+        "varying vec2 out_texcoords;\n" +
+        "void main(){\n" +
+        "    gl_Position = position;\n" +
+        "    out_texcoords = texcoords;\n" +
+        "}"
 
-    }
-    return result.toString()
-}
+const val FRAGMENT_SHADER = "" +
+        "precision mediump float;\n" +
+        "varying vec2 out_texcoords;\n" +
+        "uniform sampler2D sampler_y;\n" +
+        "uniform sampler2D sampler_u;\n" +
+        "uniform sampler2D sampler_v;\n" +
+        "void main(){\n" +
+        "    float y, u, v;\n" +
+        "    y = texture2D(sampler_y, out_texcoords).r;\n" +
+        "    u = texture2D(sampler_u, out_texcoords).r - 0.5;\n" +
+        "    v = texture2D(sampler_v, out_texcoords).r - 0.5;\n" +
+        "\n" +
+        "    vec3 rgb;\n" +
+        "    rgb.r = y + 1.403 * v;\n" +
+        "    rgb.g = y - 0.344 * u - 0.714 * v;\n" +
+        "    rgb.b = y + 1.770 * u;\n" +
+        "\n" +
+        "    gl_FragColor = vec4(rgb, 1);\n" +
+        "}"
+
 
 fun loadShader(shaderType: Int, shaderSource: String): Int {
     val shaderId = GLES30.glCreateShader(shaderType)

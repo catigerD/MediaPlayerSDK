@@ -77,7 +77,7 @@ class MediaRender(val context: Context) : GLSurfaceView.Renderer {
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        GLES30.glClearColor(1.0f, 0.0f, 0.0f, 0.0f)
         renderYUV()
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
@@ -87,22 +87,18 @@ class MediaRender(val context: Context) : GLSurfaceView.Renderer {
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        val vertexSource = context.getShaderSource(R.raw.vertex_shader)
-        val fragmentSource = context.getShaderSource(R.raw.fragment_shader)
-        ALog.d("vertexSource : ${vertexSource}\n")
-        ALog.d("fragmentSource : ${fragmentSource}\n")
-        program = createProgram(vertexSource, fragmentSource)
+        program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         if (program == 0) {
             return
         }
         vertexCoordsLocation = GLES30.glGetAttribLocation(program, "position")
-        texcoordsLocation = GLES30.glGetAttribLocation(program, "texcoordsLocation")
+        texcoordsLocation = GLES30.glGetAttribLocation(program, "texcoords")
         samplerY = GLES30.glGetUniformLocation(program, "sampler_y")
         samplerU = GLES30.glGetUniformLocation(program, "sampler_u")
         samplerV = GLES30.glGetUniformLocation(program, "sampler_v")
 
         GLES30.glGenTextures(3, textures, 0)
-        for (i in 0..3) {
+        for (i in 0 until 3) {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[i])
             GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_REPEAT)
             GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_REPEAT)
@@ -127,9 +123,10 @@ class MediaRender(val context: Context) : GLSurfaceView.Renderer {
             return
         }
         GLES30.glUseProgram(program)
-        GLES30.glVertexAttribPointer(vertexCoordsLocation, 2, GLES30.GL_FLOAT, false, 0, vertexBuffer)
         GLES30.glEnableVertexAttribArray(vertexCoordsLocation)
-        GLES30.glVertexAttribPointer(vertexCoordsLocation, 2, GLES30.GL_FLOAT, false, 0, texcoordsBuffer)
+        GLES30.glVertexAttribPointer(vertexCoordsLocation, 2, GLES30.GL_FLOAT, false, 2 * 4, vertexBuffer)
+        GLES30.glEnableVertexAttribArray(texcoordsLocation)
+        GLES30.glVertexAttribPointer(texcoordsLocation, 2, GLES30.GL_FLOAT, false, 2 * 4, texcoordsBuffer)
 
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[0])
