@@ -67,7 +67,7 @@ void MediaPlayer::prepareFfmpeg() {
                                     formatContext->duration / AV_TIME_BASE);
 
         } else if (AVMEDIA_TYPE_VIDEO == formatContext->streams[i]->codecpar->codec_type) {
-            videoMgr = make_shared<VideoMgr>(&status, i, formatContext->streams[i]->codecpar);
+            videoMgr = make_shared<VideoMgr>(&status, callJavaMgr, i, formatContext->streams[i]->codecpar);
         }
     }
 

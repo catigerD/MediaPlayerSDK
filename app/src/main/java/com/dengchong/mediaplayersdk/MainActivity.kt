@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         reqPermissions()
+        MediaPlayer.mediaSurfaceView = sv_render
         // Example of a call to a native method
         btn_prepare.setOnClickListener {
             MediaPlayer.prepare(MUSIC_LOCAL_1)

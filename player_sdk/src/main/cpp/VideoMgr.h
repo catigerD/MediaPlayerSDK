@@ -17,11 +17,12 @@ extern "C" {
 #include "AndroidLog.h"
 #include "FrameQueue.h"
 #include <array>
+#include "CallJavaMgr.h"
 
 class VideoMgr {
 
 public:
-    VideoMgr(MediaStatus *status, int index, AVCodecParameters *avCodecParameters);
+    VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVCodecParameters *avCodecParameters);
 
     ~VideoMgr();
 
@@ -76,6 +77,7 @@ private:
 
 private:
     MediaStatus *mediaStatus;
+    CallJavaMgr *callJavaMgr;
     PacketQueue packetQueue;
 
     int index;

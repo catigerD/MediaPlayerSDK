@@ -6,8 +6,9 @@
 
 const unsigned VideoMgr::MAX_FRAME_SIZE = 3;
 
-VideoMgr::VideoMgr(MediaStatus *status, int index, AVCodecParameters *avCodecParameters)
+VideoMgr::VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVCodecParameters *avCodecParameters)
         : mediaStatus(status),
+          callJavaMgr(callJavaMgr),
           packetQueue(status),
           index(index),
           avCodecParameters(avCodecParameters),
@@ -156,6 +157,14 @@ void VideoMgr::play() {
         AVFrame *frame = nullptr;
         if (frameQueue.getFrame(&frame)) {
             LOGI("frame消耗视频帧，当前第 %d 帧", count++);
+            if (callJavaMgr != nullptr) {
+                callJavaMgr->callRender(
+                        codecContext->width,
+                        codecContext->height,
+                        reinterpret_cast<char *>(frame->data[0]),
+                        reinterpret_cast<char *>(frame->data[1]),
+                        reinterpret_cast<char *>(frame->data[2]));
+            }
             av_frame_free(&frame);
             av_free(frame);
         }

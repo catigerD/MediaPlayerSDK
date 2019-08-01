@@ -22,6 +22,7 @@ private:
     jmethodID mid_prepared = nullptr;
     jmethodID mid_completed = nullptr;
     jmethodID mid_time_info = nullptr;
+    jmethodID mid_render = nullptr;
 
 public:
     CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo);
@@ -34,6 +35,8 @@ public:
     void callCompleted();
 
     void callTimeInfo(int cur, int total);
+
+    void callRender(int width, int height, char *y, char *u, char *v);
 };
 
 
