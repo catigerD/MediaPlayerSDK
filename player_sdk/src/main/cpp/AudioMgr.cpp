@@ -181,9 +181,9 @@ void pcmSimpleBufferQueueCallback(
     int ret = audioMgr->decode(&data, &size);
     LOGI("pcmSimpleBufferQueueCallback: size : %d", size);
     if (ret == 0) {
-        audioMgr->clock += size / (double) (audioMgr->sample_rate * 2 * 2);
+        audioMgr->clock += (double) size / (audioMgr->sample_rate * 2 * 2);
         if (audioMgr->clock - audioMgr->last_clock > 0.1) {
-            audioMgr->callJavaTimeInfo(audioMgr->clock, static_cast<int>(audioMgr->duration));
+            audioMgr->callJavaTimeInfo(static_cast<int>(audioMgr->clock), static_cast<int>(audioMgr->duration));
             audioMgr->last_clock = audioMgr->clock;
         }
         (*audioMgr->androidSimpleBufferQueueItf)->Enqueue(
@@ -262,7 +262,7 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
         *outputBuf = swrBuf;
         *size *= 4;
 
-        int cur_time = static_cast<int>(frame->pts * av_q2d(stream->time_base));
+        double cur_time = packet->pts * av_q2d(stream->time_base);
         if (cur_time < clock) {
             cur_time = clock;
         }

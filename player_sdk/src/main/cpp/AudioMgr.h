@@ -89,9 +89,9 @@ public:
     int streamIndex;
     AVCodecContext *codecContext = nullptr;
     //当前播放时间
-    int clock = 0;
+    double clock = 0;
     //减少 java 层调用间隔
-    int last_clock = 0;
+    double last_clock = 0;
 
     void start();
 

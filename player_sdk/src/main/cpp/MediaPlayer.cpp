@@ -4,7 +4,7 @@
 
 #include "MediaPlayer.h"
 
-const unsigned MediaPlayer::MAX_PACKET_SIZE = 100;
+const unsigned MediaPlayer::MAX_PACKET_SIZE = 20;
 
 MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
         status(),
@@ -67,7 +67,7 @@ void MediaPlayer::prepareFfmpeg() {
                                     formatContext->duration / AV_TIME_BASE);
 
         } else if (AVMEDIA_TYPE_VIDEO == formatContext->streams[i]->codecpar->codec_type) {
-            videoMgr = make_shared<VideoMgr>(&status, callJavaMgr, i, formatContext->streams[i]->codecpar);
+            videoMgr = make_shared<VideoMgr>(&status, callJavaMgr, i, formatContext->streams[i]);
         }
     }
 
@@ -80,6 +80,8 @@ void MediaPlayer::prepareFfmpeg() {
         LOGE("videoMgr.streamIndex < 0 for url : %s", url.c_str());
         return;
     }
+
+    videoMgr->setAudioClock(&audioMgr->clock);
 
     //4.获取解码器并打开
     ret = openCodec(audioMgr->stream->codecpar, &audioMgr->codecContext);

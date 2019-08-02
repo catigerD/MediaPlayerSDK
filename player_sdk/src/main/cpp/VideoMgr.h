@@ -6,6 +6,7 @@
 #define MEDIAPLAYERSDK_VIDEOMGR_H
 
 extern "C" {
+#include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
 #include "libswscale/swscale.h"
 #include "libavutil/imgutils.h"
@@ -22,7 +23,7 @@ extern "C" {
 class VideoMgr {
 
 public:
-    VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVCodecParameters *avCodecParameters);
+    VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVStream *stream);
 
     ~VideoMgr();
 
@@ -37,7 +38,10 @@ public:
     }
 
     AVCodecParameters *getCodecParameters() {
-        return avCodecParameters;
+        if (stream != nullptr) {
+            return stream->codecpar;
+        }
+        return nullptr;
     }
 
     int getIndex() {
@@ -46,6 +50,10 @@ public:
 
     void putPacket(AVPacket *packet) {
         packetQueue.putAVPacket(packet);
+    }
+
+    void setAudioClock(double *audio_clock) {
+        this->audio_clock = audio_clock;
     }
 
     int getSize() {
@@ -59,6 +67,10 @@ public:
 
 private:
     static const unsigned MAX_FRAME_SIZE;
+    static const double DEFAULT_DELAY_TIME;
+    static const double SYNCHRONIZE_SCOPE_MIN;
+    static const double SYNCHRONIZE_SCOPE_MID;
+    static const unsigned SYNCHRONIZE_SCOPE_MAX;
 
     friend void *startVideoThread(void *);
 
@@ -74,19 +86,28 @@ private:
 
     void play();
 
+    void render(AVFrame *frame);
+
+    double getDiffTime(AVFrame *frame);
+
+    double getDelayTime(double diff);
+
 private:
     MediaStatus *mediaStatus;
     CallJavaMgr *callJavaMgr;
     PacketQueue packetQueue;
 
     int index;
-    AVCodecParameters *avCodecParameters;
+    AVStream *stream;
     AVCodecContext *codecContext;
 
     pthread_t startTid;
     FrameQueue frameQueue;
 
     pthread_t playTid;
+    double *audio_clock;
+    double video_clock;
+    double delayTime;
 };
 
 void *startVideoThread(void *);
