@@ -52,7 +52,8 @@ public:
         return packetQueue.size();
     }
 
-    void clearFrame() {
+    void seek() {
+        packetQueue.clearAVPacket();
         frameQueue.clearFrame();
     }
 
@@ -68,8 +69,6 @@ private:
     }
 
     bool scaleYUV(AVFrame *inFrame, AVFrame **outFrame);
-
-    void startPlay();
 
     friend void *playThread(void *data);
 

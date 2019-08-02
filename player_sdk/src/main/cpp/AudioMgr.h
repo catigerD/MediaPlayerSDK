@@ -100,6 +100,8 @@ public:
     void pause();
 
     void resume();
+
+    void seek();
 };
 
 void pcmSimpleBufferQueueCallback(

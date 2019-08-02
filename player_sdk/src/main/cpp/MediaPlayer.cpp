@@ -231,10 +231,8 @@ void MediaPlayer::seek(int time) {
     }
     if (!status.seek) {
         status.seek = true;
-        audioMgr->pktQueue->clearAVPacket();
-        videoMgr.operator*().clearFrame();
-        audioMgr->clock = 0;
-        audioMgr->last_clock = 0;
+        audioMgr->seek();
+        videoMgr.operator*().seek();
         int64_t rel = time * AV_TIME_BASE;
         pthread_mutex_lock(&seek_mutex);
         avcodec_flush_buffers(audioMgr->codecContext);

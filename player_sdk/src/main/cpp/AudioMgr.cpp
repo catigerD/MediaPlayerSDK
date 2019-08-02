@@ -352,3 +352,11 @@ void AudioMgr::resume() {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PLAYING);
     }
 }
+
+void AudioMgr::seek() {
+    clock = 0;
+    last_clock = 0;
+    if (pktQueue != nullptr) {
+        pktQueue->clearAVPacket();
+    }
+}

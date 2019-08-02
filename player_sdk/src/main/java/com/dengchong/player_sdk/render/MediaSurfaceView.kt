@@ -62,7 +62,7 @@ class MediaRender(val context: Context) : GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
 
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        GLES30.glClearColor(1.0f, 0.0f, 0.0f, 1.0f)
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         render()
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
