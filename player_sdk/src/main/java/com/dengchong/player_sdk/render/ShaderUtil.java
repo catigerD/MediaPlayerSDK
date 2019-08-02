@@ -1,4 +1,4 @@
-package com.dengchong.mediaplayersdk;
+package com.dengchong.player_sdk.render;
 
 import android.content.Context;
 import android.opengl.GLES30;

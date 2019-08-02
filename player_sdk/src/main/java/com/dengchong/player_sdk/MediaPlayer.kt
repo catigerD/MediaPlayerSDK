@@ -93,7 +93,7 @@ object MediaPlayer {
     }
 
     private fun callRender(width: Int, height: Int, y: ByteArray, u: ByteArray, v: ByteArray) {
-        mediaSurfaceView?.render(width, height, y, u, v)
+//        mediaSurfaceView?.render(width, height, y, u, v)
     }
 
     private external fun n_initJVM()
