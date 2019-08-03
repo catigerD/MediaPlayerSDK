@@ -4,34 +4,32 @@
 
 #include "FrameQueue.h"
 
-FrameQueue::FrameQueue(MediaStatus *status)
+FrameQueue::FrameQueue(shared_ptr<MediaStatus> status)
         : status(status) {
     pthread_mutex_init(&mutex, nullptr);
     pthread_cond_init(&cond, nullptr);
 }
 
 FrameQueue::~FrameQueue() {
-    clearFrame();
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&mutex);
-    status = nullptr;
 }
 
-void FrameQueue::putFrame(AVFrame *frame) {
+void FrameQueue::put(const shared_ptr<AVFrame> &frame) {
     Lock lock(&mutex);
     frameQueue.push(frame);
     pthread_cond_signal(&cond);
 }
 
-bool FrameQueue::getFrame(AVFrame **outFrame) {
+bool FrameQueue::get(shared_ptr<AVFrame> &frame) {
     Lock lock(&mutex);
-    while (status != nullptr && !status->exit) {
-        if (status != nullptr && status->seek) {
+    while (status && !status->exit) {
+        if (status && status->seek) {
             sleep();
             continue;
         }
         if (!frameQueue.empty()) {
-            *outFrame = frameQueue.front();
+            frame = frameQueue.front();
             frameQueue.pop();
             return true;
         } else {
@@ -41,14 +39,11 @@ bool FrameQueue::getFrame(AVFrame **outFrame) {
     return false;
 }
 
-void FrameQueue::clearFrame() {
+void FrameQueue::clear() {
     pthread_cond_signal(&cond);
     Lock lock(&mutex);
     while (!frameQueue.empty()) {
-        AVFrame *frame = frameQueue.front();
         frameQueue.pop();
-        av_frame_free(&frame);
-        av_free(frame);
     }
 }
 

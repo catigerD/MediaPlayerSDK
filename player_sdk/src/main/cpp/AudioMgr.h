@@ -20,6 +20,7 @@ extern "C" {
 #include <assert.h>
 #include "CallJavaMgr.h"
 #include "Common.h"
+#include "AVWrap.h"
 
 class AudioMgr {
 private:
@@ -62,11 +63,9 @@ private:
     void destroyOpenSLES();
 
     //解码相关资源
-    AVPacket *packet = nullptr;
-    AVFrame *frame = nullptr;
-    SwrContext *swrContext = nullptr;
-
-    void releaseDecodeRes();
+    shared_ptr<AVPacket> packet;
+    shared_ptr<AVFrame> frame;
+    shared_ptr<SwrContext> swrContext;
 
     int decode(uint8_t **outputBuf, int *size);
 
@@ -78,11 +77,11 @@ private:
     void callJavaTimeInfo(int cur, int total);
 
 public:
-    AudioMgr(CallJavaMgr *callJavaMgr, MediaStatus *status, int index, AVStream *stream, int64_t duration);
+    AudioMgr(CallJavaMgr *callJavaMgr, shared_ptr<MediaStatus> &status, int index, AVStream *stream, int64_t duration);
 
     ~AudioMgr();
 
-    MediaStatus *status;
+    shared_ptr<MediaStatus> &status;
     AVStream *stream = nullptr;
 
     PacketQueue *pktQueue;

@@ -18,7 +18,7 @@ extern "C" {
 #include "AndroidLog.h"
 #include "Common.h"
 #include "VideoMgr.h"
-#include <memory>
+#include <AVWrap.h>
 
 using namespace std;
 
@@ -56,12 +56,12 @@ private:
 
 private:
 
-    MediaStatus status;
+    shared_ptr<MediaStatus> status;
     //回调 java 层
     CallJavaMgr *callJavaMgr;
 
     string url;
-    AVFormatContext *formatContext;
+    shared_ptr<AVFormatContext> spFormatCtx;
     //audio相关
     AudioMgr *audioMgr;
     shared_ptr<VideoMgr> videoMgr;

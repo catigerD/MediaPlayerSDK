@@ -2,6 +2,7 @@
 // Created by dengchong on 2019-07-30.
 //
 
+#include <common/AVWrap.h>
 #include "VideoMgr.h"
 
 const unsigned VideoMgr::MAX_FRAME_SIZE = 3;
@@ -10,7 +11,7 @@ const double VideoMgr::SYNCHRONIZE_SCOPE_MIN = 0.003;
 const double VideoMgr::SYNCHRONIZE_SCOPE_MID = 0.5;
 const unsigned VideoMgr::SYNCHRONIZE_SCOPE_MAX = 10;
 
-VideoMgr::VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVStream *stream)
+VideoMgr::VideoMgr(shared_ptr<MediaStatus> &status, CallJavaMgr *callJavaMgr, int index, AVStream *stream)
         : mediaStatus(status),
           callJavaMgr(callJavaMgr),
           packetQueue(status),
@@ -51,69 +52,40 @@ void VideoMgr::decode() {
             sleep();
             continue;
         }
-        AVPacket *packet = nullptr;
-        packetQueue.getAVPacket(&packet);
-        ret = avcodec_send_packet(codecContext, packet);
+        packetQueue.pop(packet);
+        ret = avcodec_send_packet(codecContext, packet.get());
         if (ret != 0) {
-            av_packet_free(&packet);
-            av_free(packet);
             continue;
         }
-        AVFrame *frame = av_frame_alloc();
-        ret = avcodec_receive_frame(codecContext, frame);
+        frame = AVWrap::allocAVFrame();
+        ret = avcodec_receive_frame(codecContext, frame.get());
         if (ret != 0) {
-            av_frame_free(&frame);
-            av_free(frame);
-            av_packet_free(&packet);
-            av_free(packet);
             continue;
         }
-        AVFrame *outFrame = nullptr;
+        shared_ptr<AVFrame> outFrame;
         if (needScale(frame)) {
-            if (!scaleYUV(frame, &outFrame)) {
-                av_frame_free(&frame);
-                av_free(frame);
-                av_packet_free(&packet);
-                av_free(packet);
+            if (!scaleYUV(frame, outFrame)) {
                 continue;
-            } else {
-                av_frame_free(&frame);
-                av_free(frame);
-                av_packet_free(&packet);
-                av_free(packet);
             }
         } else {
             outFrame = frame;
-            av_packet_free(&packet);
-            av_free(packet);
         }
         if (frameQueue.size() > MAX_FRAME_SIZE) {
             sleep();
             continue;
         }
-        frameQueue.putFrame(outFrame);
+        frameQueue.put(outFrame);
         LOGI("frame添加视频帧，当前第 %d 帧", count++);
     }
 }
 
-bool VideoMgr::scaleYUV(AVFrame *inFrame, AVFrame **outFrame) {
-    SwsContext *swsContext = sws_getContext(
-            inFrame->width,
-            inFrame->height,
-            static_cast<AVPixelFormat>(inFrame->format),
-            inFrame->width,
-            inFrame->height,
-            AV_PIX_FMT_YUV420P,
-            SWS_BICUBIC,
-            nullptr,
-            nullptr,
-            nullptr);
-
-    if (swsContext == nullptr) {
+bool VideoMgr::scaleYUV(shared_ptr<AVFrame> &inFrame, shared_ptr<AVFrame> &outFrame) {
+    shared_ptr<SwsContext> swsContext = AVWrap::allocSwsContext(inFrame);
+    if (!swsContext) {
         LOGE("swsContext == nullptr");
         return false;
     }
-    AVFrame *yuvFrame = av_frame_alloc();
+    shared_ptr<AVFrame> yuvFrame = AVWrap::allocAVFrame();
     int num = av_image_get_buffer_size(AV_PIX_FMT_YUV420P, inFrame->width, inFrame->height, 1);
     uint8_t *buf = new uint8_t[num];
     int ret = av_image_fill_arrays(
@@ -127,21 +99,17 @@ bool VideoMgr::scaleYUV(AVFrame *inFrame, AVFrame **outFrame) {
     if (ret < 0) {
         LOGE("av_image_fill_arrays fail");
         delete[] buf;
-        av_frame_free(&yuvFrame);
-        av_free(yuvFrame);
-        sws_freeContext(swsContext);
         return false;
     }
     sws_scale(
-            swsContext,
+            swsContext.get(),
             inFrame->data,
             inFrame->linesize,
             0,
             inFrame->height,
             yuvFrame->data,
             yuvFrame->linesize);
-    *outFrame = yuvFrame;
-    sws_freeContext(swsContext);
+    outFrame = yuvFrame;
     return true;
 }
 
@@ -162,19 +130,17 @@ void VideoMgr::play() {
             sleep();
             continue;
         }
-        AVFrame *frame = nullptr;
-        if (frameQueue.getFrame(&frame)) {
+        shared_ptr<AVFrame> frame = AVWrap::allocAVFrame();
+        if (frameQueue.get(frame)) {
             LOGI("frame消耗视频帧，当前第 %d 帧", count++);
             av_usleep(static_cast<unsigned int>(getDelayTime(getDiffTime(frame)) * 1000000));
             render(frame);
-            av_frame_free(&frame);
-            av_free(frame);
         }
     }
 }
 
-double VideoMgr::getDiffTime(AVFrame *frame) {
-    int64_t pts = av_frame_get_best_effort_timestamp(frame);
+double VideoMgr::getDiffTime(shared_ptr<AVFrame> frame) {
+    int64_t pts = av_frame_get_best_effort_timestamp(frame.get());
     if (pts == AV_NOPTS_VALUE) {
         pts = 0;
     }
@@ -216,7 +182,7 @@ double VideoMgr::getDelayTime(double diff) {
     return delayTime;
 }
 
-void VideoMgr::render(AVFrame *frame) {
+void VideoMgr::render(shared_ptr<AVFrame> frame) {
     if (callJavaMgr != nullptr) {
         callJavaMgr->callRender(
                 codecContext->width,

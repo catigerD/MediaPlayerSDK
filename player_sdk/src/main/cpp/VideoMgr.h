@@ -19,11 +19,12 @@ extern "C" {
 #include "FrameQueue.h"
 #include <array>
 #include "CallJavaMgr.h"
+#include <memory>
 
 class VideoMgr {
 
 public:
-    VideoMgr(MediaStatus *status, CallJavaMgr *callJavaMgr, int index, AVStream *stream);
+    VideoMgr(shared_ptr<MediaStatus> &status, CallJavaMgr *callJavaMgr, int index, AVStream *stream);
 
     ~VideoMgr();
 
@@ -48,8 +49,8 @@ public:
         return index;
     }
 
-    void putPacket(AVPacket *packet) {
-        packetQueue.putAVPacket(packet);
+    void putPacket(shared_ptr<AVPacket> packet) {
+        packetQueue.push(packet);
     }
 
     void setAudioClock(double *audio_clock) {
@@ -61,8 +62,8 @@ public:
     }
 
     void seek() {
-        packetQueue.clearAVPacket();
-        frameQueue.clearFrame();
+        packetQueue.clear();
+        frameQueue.clear();
     }
 
 private:
@@ -76,24 +77,24 @@ private:
 
     void decode();
 
-    bool needScale(AVFrame *frame) {
+    bool needScale(const shared_ptr<AVFrame> &frame) const {
         return AV_PIX_FMT_YUV420P == frame->format;
     }
 
-    bool scaleYUV(AVFrame *inFrame, AVFrame **outFrame);
+    bool scaleYUV(shared_ptr<AVFrame> &inFrame, shared_ptr<AVFrame> &outFrame);
 
     friend void *playThread(void *data);
 
     void play();
 
-    void render(AVFrame *frame);
+    void render(shared_ptr<AVFrame> frame);
 
-    double getDiffTime(AVFrame *frame);
+    double getDiffTime(shared_ptr<AVFrame> frame);
 
     double getDelayTime(double diff);
 
 private:
-    MediaStatus *mediaStatus;
+    shared_ptr<MediaStatus> &mediaStatus;
     CallJavaMgr *callJavaMgr;
     PacketQueue packetQueue;
 
@@ -102,6 +103,9 @@ private:
     AVCodecContext *codecContext;
 
     pthread_t startTid;
+    shared_ptr<AVPacket> packet;
+    shared_ptr<AVFrame> frame;
+    shared_ptr<SwsContext> swsContext;
     FrameQueue frameQueue;
 
     pthread_t playTid;

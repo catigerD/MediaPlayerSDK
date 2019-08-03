@@ -5,38 +5,35 @@
 #ifndef MEDIAPLAYERSDK_FRAMEQUEUE_H
 #define MEDIAPLAYERSDK_FRAMEQUEUE_H
 
-extern "C" {
-#include "libavcodec/avcodec.h"
-};
-
 #include <queue>
 #include "MediaStatus.h"
 #include "pthread.h"
 #include "Lock.h"
 #include "Common.h"
+#include "AVWrap.h"
 
 using namespace std;
 
 class FrameQueue {
 public:
-    FrameQueue(MediaStatus *status);
+    FrameQueue(shared_ptr<MediaStatus> status);
 
     ~FrameQueue();
 
-    void putFrame(AVFrame *frame);
+    void put(const shared_ptr<AVFrame> &frame);
 
-    bool getFrame(AVFrame **outFrame);
+    bool get(shared_ptr<AVFrame> &frame);
 
     int size() {
         Lock lock(&mutex);
         return frameQueue.size();
     }
 
-    void clearFrame();
+    void clear();
 
 private:
-    MediaStatus *status;
-    queue<AVFrame *> frameQueue;
+    shared_ptr<MediaStatus> status;
+    queue<shared_ptr<AVFrame>> frameQueue;
 
     pthread_mutex_t mutex;
     pthread_cond_t cond;

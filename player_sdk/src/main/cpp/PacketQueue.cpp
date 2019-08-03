@@ -4,18 +4,17 @@
 
 #include "PacketQueue.h"
 
-PacketQueue::PacketQueue(MediaStatus *status) : status(status) {
+PacketQueue::PacketQueue(shared_ptr<MediaStatus> &status) : status(status) {
     pthread_mutex_init(&mutex, nullptr);
     pthread_cond_init(&cond, nullptr);
 }
 
 PacketQueue::~PacketQueue() {
-    clearAVPacket();
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&mutex);
 }
 
-bool PacketQueue::putAVPacket(AVPacket *packet) {
+bool PacketQueue::push(shared_ptr<AVPacket> packet) {
     pthread_mutex_lock(&mutex);
     pktQueue.push(packet);
     pthread_cond_signal(&cond);
@@ -23,11 +22,11 @@ bool PacketQueue::putAVPacket(AVPacket *packet) {
     return true;
 }
 
-bool PacketQueue::getAVPacket(AVPacket **packet) {
+bool PacketQueue::pop(shared_ptr<AVPacket> &packet) {
     pthread_mutex_lock(&mutex);
     while (!status->exit) {
         if (pktQueue.size() > 0) {
-            *packet = pktQueue.front();
+            packet = pktQueue.front();
             pktQueue.pop();
             break;
         } else {
@@ -45,14 +44,11 @@ queue<AVPacket *>::size_type PacketQueue::size() {
     return size;
 }
 
-void PacketQueue::clearAVPacket() {
+void PacketQueue::clear() {
     pthread_cond_signal(&cond);
     pthread_mutex_lock(&mutex);
     while (!pktQueue.empty()) {
-        AVPacket *packet = pktQueue.front();
         pktQueue.pop();
-        av_packet_free(&packet);
-        av_free(packet);
     }
     pthread_mutex_unlock(&mutex);
 }

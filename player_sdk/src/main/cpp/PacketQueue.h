@@ -12,31 +12,31 @@ extern "C" {
 #include <queue>
 #include <pthread.h>
 #include "MediaStatus.h"
+#include <memory>
 
 using namespace std;
 
 class PacketQueue {
 private:
-    queue<AVPacket *> pktQueue;
+    queue<shared_ptr<AVPacket>> pktQueue;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
 
-    MediaStatus *status = nullptr;
+    shared_ptr<MediaStatus> &status;
 
 public:
 
-    PacketQueue(MediaStatus *status);
+    PacketQueue(shared_ptr<MediaStatus> &status);
 
     ~PacketQueue();
 
-    bool putAVPacket(AVPacket *packet);
+    bool push(shared_ptr<AVPacket> packet);
 
-    bool getAVPacket(AVPacket **packet);
+    bool pop(shared_ptr<AVPacket> &packet);
 
-    queue<AVPacket *>::size_type size();
+    queue<shared_ptr<AVPacket>>::size_type size();
 
-    void clearAVPacket();
+    void clear();
 };
-
 
 #endif //MEDIAPLAYERSDK_PACKETQUEUE_H

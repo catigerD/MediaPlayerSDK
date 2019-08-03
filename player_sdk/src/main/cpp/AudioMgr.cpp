@@ -4,7 +4,8 @@
 
 #include "AudioMgr.h"
 
-AudioMgr::AudioMgr(CallJavaMgr *callJavaMgr, MediaStatus *status, int index, AVStream *stream, int64_t duration) :
+AudioMgr::AudioMgr(CallJavaMgr *callJavaMgr, shared_ptr<MediaStatus> &status, int index, AVStream *stream,
+                   int64_t duration) :
         status(status),
         callJavaMgr(callJavaMgr),
         stream(stream),
@@ -22,7 +23,6 @@ AudioMgr::~AudioMgr() {
 
     delete[] swrBuf;
     delete pktQueue;
-    releaseDecodeRes();
 
     stream = nullptr;
     callJavaMgr = nullptr;
@@ -204,57 +204,53 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
             continue;
         }
         if (decodeAPacketFinish) {
-            if (!pktQueue->getAVPacket(&packet)) {
+            if (!pktQueue->pop(packet)) {
                 status->decode = false;
                 continue;
             }
-            ret = avcodec_send_packet(codecContext, packet);
+            ret = avcodec_send_packet(codecContext, packet.get());
             if (ret != 0) {
                 LOGI("start loop avcodec_send_packet fail ,error msg : %s", av_err2str(ret));
-                releaseDecodeRes();
                 decodeAPacketFinish = true;
                 status->decode = false;
                 continue;
             }
         }
-        frame = av_frame_alloc();
-        ret = avcodec_receive_frame(codecContext, frame);
+        frame = AVWrap::allocAVFrame();
+        ret = avcodec_receive_frame(codecContext, frame.get());
         if (ret != 0) {
             LOGI("start loop avcodec_receive_frame fail ,error msg : %s", av_err2str(ret));
-            releaseDecodeRes();
             decodeAPacketFinish = true;
             status->decode = false;
             continue;
         }
         //消耗 frame
-        //?是否需要每次都转换？
-        swrContext = swr_alloc_set_opts(nullptr,
-                                        AV_CH_LAYOUT_STEREO,
-                                        AV_SAMPLE_FMT_S16,
-                                        frame->sample_rate,
-                                        frame->channel_layout,
-                                        static_cast<AVSampleFormat>(frame->format),
-                                        frame->sample_rate,
-                                        0,
-                                        nullptr
+        swrContext = AVWrap::allocSwrContext();
+        swr_alloc_set_opts(swrContext.get(),
+                           AV_CH_LAYOUT_STEREO,
+                           AV_SAMPLE_FMT_S16,
+                           frame->sample_rate,
+                           frame->channel_layout,
+                           static_cast<AVSampleFormat>(frame->format),
+                           frame->sample_rate,
+                           0,
+                           nullptr
         );
-        if (swrContext == nullptr) {
+        if (!swrContext) {
             LOGI("start loop swrContext = nullptr ,error msg");
-            releaseDecodeRes();
             decodeAPacketFinish = true;
             status->decode = false;
             continue;
         }
-        int init = swr_init(swrContext);
+        int init = swr_init(swrContext.get());
         if (init < 0) {
             LOGI("start loop swr_init fail ,error msg : %s", av_err2str(init));
-            releaseDecodeRes();
             decodeAPacketFinish = true;
             status->decode = false;
             continue;
         }
         decodeAPacketFinish = false;
-        *size = swr_convert(swrContext,
+        *size = swr_convert(swrContext.get(),
                             &swrBuf,
                             frame->nb_samples,
                             reinterpret_cast<const uint8_t **>(&frame->data),
@@ -268,7 +264,6 @@ int AudioMgr::decode(uint8_t **outputBuf, int *size) {
         }
         clock = cur_time;
 
-        releaseDecodeRes();
         status->decode = false;
         break;
     }
@@ -323,18 +318,6 @@ SLuint32 AudioMgr::getCurrentSimpleRate() {
     return rate;
 }
 
-void AudioMgr::releaseDecodeRes() {
-    if (swrContext != nullptr) {
-        swr_free(&swrContext);
-    }
-    if (frame != nullptr) {
-        av_frame_free(&frame);
-    }
-    if (packet != nullptr) {
-        av_packet_free(&packet);
-    }
-}
-
 void AudioMgr::stop() {
     if (playItf != nullptr) {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_STOPPED);
@@ -357,6 +340,6 @@ void AudioMgr::seek() {
     clock = 0;
     last_clock = 0;
     if (pktQueue != nullptr) {
-        pktQueue->clearAVPacket();
+        pktQueue->clear();
     }
 }
