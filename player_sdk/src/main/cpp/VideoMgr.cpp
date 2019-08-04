@@ -11,16 +11,10 @@ const double VideoMgr::SYNCHRONIZE_SCOPE_MIN = 0.003;
 const double VideoMgr::SYNCHRONIZE_SCOPE_MID = 0.5;
 const unsigned VideoMgr::SYNCHRONIZE_SCOPE_MAX = 10;
 
-VideoMgr::VideoMgr(shared_ptr<MediaStatus> &status, CallJavaMgr *callJavaMgr, int index, AVStream *stream)
-        : mediaStatus(status),
-          callJavaMgr(callJavaMgr),
-          packetQueue(status),
-          index(index),
-          stream(stream),
-          codecContext(nullptr),
-          frameQueue(status),
-          audio_clock(nullptr),
-          video_clock(0),
+VideoMgr::VideoMgr(shared_ptr<CallJavaMgr> &callJavaMgr, shared_ptr<MediaStatus> &status, int index,
+                   shared_ptr<AVFormatContext> &formatContext)
+        : MediaMgr(callJavaMgr, status, index, formatContext),
+          frameQueue(make_shared<FrameQueue>(status)),
           delayTime(0) {
 
 }
@@ -30,36 +24,38 @@ VideoMgr::~VideoMgr() {
 }
 
 void VideoMgr::start() {
-    pthread_create(&startTid, nullptr, startVideoThread, this);
+    pthread_create(&startTid, nullptr, videoStartThread, this);
     pthread_create(&playTid, nullptr, playThread, this);
 }
 
-void *startVideoThread(void *data) {
+void *videoStartThread(void *data) {
     VideoMgr *videoMgr = static_cast<VideoMgr *>(data);
     videoMgr->decode();
     pthread_exit(&videoMgr->startTid);
 }
 
 void VideoMgr::decode() {
-    int ret = 0;
+    int errorCode = 0;
     int count = 0;
-    while (mediaStatus != nullptr && !mediaStatus->exit) {
-        if (mediaStatus != nullptr && mediaStatus->seek) {
+    while (status && !status->exit) {
+        if (status && status->seek) {
             sleep();
             continue;
         }
-        if (packetQueue.size() == 0) {
+        if (!hasData()) {
             sleep();
             continue;
         }
-        packetQueue.pop(packet);
-        ret = avcodec_send_packet(codecContext, packet.get());
-        if (ret != 0) {
+        packetQueue->pop(packet);
+        errorCode = avcodec_send_packet(codecContext.get(), packet.get());
+        if (errorCode != 0) {
+            LOGE("video avcodec_send_packet failed ... ,error msg : %s", av_err2str(errorCode));
             continue;
         }
         frame = AVWrap::allocAVFrame();
-        ret = avcodec_receive_frame(codecContext, frame.get());
-        if (ret != 0) {
+        errorCode = avcodec_receive_frame(codecContext.get(), frame.get());
+        if (errorCode != 0) {
+            LOGI("video avcodec_receive_frame failed ...  ,error msg : %s", av_err2str(errorCode));
             continue;
         }
         shared_ptr<AVFrame> outFrame;
@@ -70,12 +66,12 @@ void VideoMgr::decode() {
         } else {
             outFrame = frame;
         }
-        if (frameQueue.size() > MAX_FRAME_SIZE) {
+        if (frameQueue->size() > MAX_FRAME_SIZE) {
             sleep();
             continue;
         }
-        frameQueue.put(outFrame);
-        LOGI("frame添加视频帧，当前第 %d 帧", count++);
+        frameQueue->put(outFrame);
+        LOGI("VideoMgr::decode() : count %d", count++);
     }
 }
 
@@ -121,20 +117,20 @@ void *playThread(void *data) {
 
 void VideoMgr::play() {
     int count = 0;
-    while (mediaStatus != nullptr && !mediaStatus->exit) {
-        if (mediaStatus != nullptr && mediaStatus->seek) {
+    while (status && !status->exit) {
+        if (status && (status->seek || status->pause)) {
             sleep();
             continue;
         }
-        if (frameQueue.size() == 0) {
+        if (frameQueue->size() == 0) {
             sleep();
             continue;
         }
-        shared_ptr<AVFrame> frame = AVWrap::allocAVFrame();
-        if (frameQueue.get(frame)) {
-            LOGI("frame消耗视频帧，当前第 %d 帧", count++);
+        shared_ptr<AVFrame> frame;
+        if (frameQueue->get(frame)) {
             av_usleep(static_cast<unsigned int>(getDelayTime(getDiffTime(frame)) * 1000000));
             render(frame);
+            LOGI("VideoMgr::play() : count %d", count++);
         }
     }
 }
@@ -144,11 +140,11 @@ double VideoMgr::getDiffTime(shared_ptr<AVFrame> frame) {
     if (pts == AV_NOPTS_VALUE) {
         pts = 0;
     }
-    pts *= av_q2d(stream->time_base);
+    pts *= av_q2d(formatContext->streams[index]->time_base);
     if (pts > 0) {
-        video_clock = pts;
+        clock = pts;
     }
-    double diff = *audio_clock - video_clock;
+    double diff = audioMgr->getClock() - clock;
     return diff;
 }
 

@@ -10,6 +10,7 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libswscale/swscale.h"
 #include "libswresample/swresample.h"
+#include "libavutil/imgutils.h"
 };
 
 #include <memory>
@@ -82,6 +83,28 @@ public:
 
     static shared_ptr<SwrContext> allocSwrContext() {
         return shared_ptr<SwrContext>(swr_alloc(), freeSwrContext);
+    }
+
+    static shared_ptr<SwrContext> allocSwrContext(const shared_ptr<AVFrame> &frame) {
+        shared_ptr<SwrContext> swrContext(swr_alloc(), freeSwrContext);
+        if (!swrContext) {
+            return shared_ptr<SwrContext>();
+        }
+        swr_alloc_set_opts(swrContext.get(),
+                           AV_CH_LAYOUT_STEREO,
+                           AV_SAMPLE_FMT_S16,
+                           frame->sample_rate,
+                           frame->channel_layout,
+                           static_cast<AVSampleFormat>(frame->format),
+                           frame->sample_rate,
+                           0,
+                           nullptr
+        );
+        int ret = swr_init(swrContext.get());
+        if (ret < 0) {
+            return shared_ptr<SwrContext>();
+        }
+        return swrContext;
     }
 };
 

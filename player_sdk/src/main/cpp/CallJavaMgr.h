@@ -15,14 +15,14 @@ enum ThreadType {
 
 class CallJavaMgr {
 private:
-    JavaVM *javaVM = nullptr;
-    JNIEnv *jniEnv = nullptr;
-    jobject jobj = nullptr;
+    JavaVM *mVM;
+    JNIEnv *mEnv;
+    jobject mObj;
 
-    jmethodID mid_prepared = nullptr;
-    jmethodID mid_completed = nullptr;
-    jmethodID mid_time_info = nullptr;
-    jmethodID mid_render = nullptr;
+    jmethodID mid_prepared;
+    jmethodID mid_completed;
+    jmethodID mid_time_info;
+    jmethodID mid_render;
 
 public:
     CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo);

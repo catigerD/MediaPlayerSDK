@@ -5,65 +5,36 @@
 #ifndef MEDIAPLAYERSDK_VIDEOMGR_H
 #define MEDIAPLAYERSDK_VIDEOMGR_H
 
-extern "C" {
-#include "libavformat/avformat.h"
-#include "libavcodec/avcodec.h"
-#include "libswscale/swscale.h"
-#include "libavutil/imgutils.h"
-};
-
-#include "MediaStatus.h"
-#include "PacketQueue.h"
 #include "Common.h"
-#include "AndroidLog.h"
 #include "FrameQueue.h"
-#include <array>
-#include "CallJavaMgr.h"
-#include <memory>
+#include "MediaMgr.h"
+#include "AudioMgr.h"
 
-class VideoMgr {
+class VideoMgr : public MediaMgr {
 
 public:
-    VideoMgr(shared_ptr<MediaStatus> &status, CallJavaMgr *callJavaMgr, int index, AVStream *stream);
+    VideoMgr(shared_ptr<CallJavaMgr> &callJavaMgr, shared_ptr<MediaStatus> &status, int index,
+             shared_ptr<AVFormatContext> &formatContext);
 
     ~VideoMgr();
 
     void start();
 
-    void setCodecContext(AVCodecContext *context) {
-        if (codecContext != nullptr) {
-            avcodec_close(codecContext);
-            avcodec_free_context(&codecContext);
-        }
-        codecContext = context;
-    }
-
-    AVCodecParameters *getCodecParameters() {
-        if (stream != nullptr) {
-            return stream->codecpar;
-        }
-        return nullptr;
-    }
-
-    int getIndex() {
+    int getStreamIndex() {
         return index;
     }
 
-    void putPacket(shared_ptr<AVPacket> packet) {
-        packetQueue.push(packet);
+    void setAudioMgr(shared_ptr<AudioMgr> &audioMgr) {
+        this->audioMgr = audioMgr;
     }
 
-    void setAudioClock(double *audio_clock) {
-        this->audio_clock = audio_clock;
-    }
-
-    int getSize() {
-        return packetQueue.size();
+    void putPacket(const shared_ptr<AVPacket> &packet) {
+        packetQueue->push(packet);
     }
 
     void seek() {
-        packetQueue.clear();
-        frameQueue.clear();
+        packetQueue->clear();
+        frameQueue->clear();
     }
 
 private:
@@ -73,7 +44,7 @@ private:
     static const double SYNCHRONIZE_SCOPE_MID;
     static const unsigned SYNCHRONIZE_SCOPE_MAX;
 
-    friend void *startVideoThread(void *);
+    friend void *videoStartThread(void *);
 
     void decode();
 
@@ -94,27 +65,19 @@ private:
     double getDelayTime(double diff);
 
 private:
-    shared_ptr<MediaStatus> &mediaStatus;
-    CallJavaMgr *callJavaMgr;
-    PacketQueue packetQueue;
-
-    int index;
-    AVStream *stream;
-    AVCodecContext *codecContext;
-
     pthread_t startTid;
+    shared_ptr<FrameQueue> frameQueue;
+
     shared_ptr<AVPacket> packet;
     shared_ptr<AVFrame> frame;
     shared_ptr<SwsContext> swsContext;
-    FrameQueue frameQueue;
 
     pthread_t playTid;
-    double *audio_clock;
-    double video_clock;
+    shared_ptr<AudioMgr> audioMgr;
     double delayTime;
 };
 
-void *startVideoThread(void *);
+void *videoStartThread(void *);
 
 void *playThread(void *data);
 

@@ -5,100 +5,97 @@
 #include "CallJavaMgr.h"
 
 CallJavaMgr::CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo) :
-        javaVM(vm),
-        jniEnv(env),
-        jobj(jniEnv->NewGlobalRef(jo)) {
-    jclass clz = env->GetObjectClass(jobj);
+        mVM(vm),
+        mEnv(env),
+        mObj(mEnv->NewGlobalRef(jo)) {
+    jclass clz = env->GetObjectClass(mObj);
     if (clz == nullptr) {
-        LOGE("env->GetObjectClass(jobj) is null");
+        LOGE("env->GetObjectClass(mObj) is null");
         return;
     }
     mid_prepared = env->GetMethodID(clz, "callPrepared", "()V");
     mid_completed = env->GetMethodID(clz, "callCompleted", "()V");
     mid_time_info = env->GetMethodID(clz, "callTimeInfo", "(II)V");
     mid_render = env->GetMethodID(clz, "callRender", "(II[B[B[B)V");
+
+    mEnv->DeleteLocalRef(clz);
 }
 
 CallJavaMgr::~CallJavaMgr() {
-    mid_time_info = nullptr;
-    mid_completed = nullptr;
-    mid_prepared = nullptr;
-
-    jniEnv->DeleteGlobalRef(jobj);
-    jniEnv = nullptr;
-    javaVM = nullptr;
+    mEnv->DeleteGlobalRef(mObj);
 }
 
 void CallJavaMgr::callPrepared() {
-    if (mid_prepared == nullptr) {
+    if (!mid_prepared) {
         return;
     }
     JNIEnv *env;
     bool isAttach = false;
     int ret;
-    ret = javaVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (JNI_OK != ret) {
-        if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             return;
         }
         isAttach = true;
     }
-    env->CallVoidMethod(jobj, mid_prepared);
+    //todo 使用 lambda
+    env->CallVoidMethod(mObj, mid_prepared);
     if (isAttach) {
-        javaVM->DetachCurrentThread();
+        mVM->DetachCurrentThread();
     }
 }
 
 void CallJavaMgr::callCompleted() {
-    if (mid_completed == nullptr) {
+    if (!mid_completed) {
         return;
     }
     JNIEnv *env;
     bool isAttach = false;
     int ret;
-    ret = javaVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (JNI_OK != ret) {
-        if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             return;
         }
         isAttach = true;
     }
-    env->CallVoidMethod(jobj, mid_completed);
+    env->CallVoidMethod(mObj, mid_completed);
     if (isAttach) {
-        javaVM->DetachCurrentThread();
+        mVM->DetachCurrentThread();
     }
 }
 
 void CallJavaMgr::callTimeInfo(int cur, int total) {
-    if (mid_time_info == nullptr) {
+    if (!mid_time_info) {
         return;
     }
     JNIEnv *env;
     bool isAttach = false;
     int ret;
-    ret = javaVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (JNI_OK != ret) {
-        if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             return;
         }
         isAttach = true;
     }
-    env->CallVoidMethod(jobj, mid_time_info, cur, total);
+    env->CallVoidMethod(mObj, mid_time_info, cur, total);
     if (isAttach) {
-        javaVM->DetachCurrentThread();
+        mVM->DetachCurrentThread();
     }
 }
 
 void CallJavaMgr::callRender(int width, int height, char *y, char *u, char *v) {
-    if (mid_render == nullptr) {
+    if (!mid_render) {
         return;
     }
     JNIEnv *env;
     bool isAttach = false;
     int ret;
-    ret = javaVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (JNI_OK != ret) {
-        if (javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             return;
         }
         isAttach = true;
@@ -110,13 +107,14 @@ void CallJavaMgr::callRender(int width, int height, char *y, char *u, char *v) {
     jbyteArray vArray = env->NewByteArray(width / 2 * height / 2);
     env->SetByteArrayRegion(vArray, 0, width / 2 * height / 2, reinterpret_cast<const jbyte *>(v));
 
-    env->CallVoidMethod(jobj, mid_render, width, height, yArray, uArray, vArray);
+    env->CallVoidMethod(mObj, mid_render, width, height, yArray, uArray, vArray);
 
     env->DeleteLocalRef(yArray);
     env->DeleteLocalRef(uArray);
     env->DeleteLocalRef(vArray);
+    //todo 内存泄漏的元凶？
     if (isAttach) {
-        javaVM->DetachCurrentThread();
+        mVM->DetachCurrentThread();
     }
 }
 

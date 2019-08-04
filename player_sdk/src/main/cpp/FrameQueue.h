@@ -16,7 +16,7 @@ using namespace std;
 
 class FrameQueue {
 public:
-    FrameQueue(shared_ptr<MediaStatus> status);
+    FrameQueue(shared_ptr<MediaStatus> &status);
 
     ~FrameQueue();
 
@@ -32,7 +32,7 @@ public:
     void clear();
 
 private:
-    shared_ptr<MediaStatus> status;
+    shared_ptr<MediaStatus> &status;
     queue<shared_ptr<AVFrame>> frameQueue;
 
     pthread_mutex_t mutex;

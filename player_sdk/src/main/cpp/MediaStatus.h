@@ -17,6 +17,8 @@ public:
     bool decode = false;
 
     bool seek = false;
+
+    bool pause = false;
 };
 
 

@@ -4,36 +4,41 @@
 
 #include "AudioMgr.h"
 
-AudioMgr::AudioMgr(CallJavaMgr *callJavaMgr, shared_ptr<MediaStatus> &status, int index, AVStream *stream,
-                   int64_t duration) :
-        status(status),
-        callJavaMgr(callJavaMgr),
-        stream(stream),
-        streamIndex(index),
-        duration(duration) {
-    pktQueue = new PacketQueue(status);
-    sample_rate = stream->codecpar->sample_rate;
-    swrBuf = new uint8_t[sample_rate * 2 * 2];
+AudioMgr::AudioMgr(shared_ptr<CallJavaMgr> &callJavaMgr, shared_ptr<MediaStatus> &status, int index,
+                   shared_ptr<AVFormatContext> &formatContext)
+        : MediaMgr(callJavaMgr, status, index, formatContext),
+          gotPacket(true),
+          sample_rate(formatContext->streams[index]->codecpar->sample_rate),
+          convertBuffer(shared_ptr<uint8_t>(new uint8_t[sample_rate * 2 * 2])) {
+
 }
 
 AudioMgr::~AudioMgr() {
     destroyOpenSLES();
-    avcodec_close(codecContext);
-    avcodec_free_context(&codecContext);
+}
 
-    delete[] swrBuf;
-    delete pktQueue;
 
-    stream = nullptr;
-    callJavaMgr = nullptr;
-    status = nullptr;
+void AudioMgr::start() {
+    pthread_create(&startTid, nullptr, audioStartThread, this);
+}
+
+void *audioStartThread(void *data) {
+    AudioMgr *audioMgr = static_cast<AudioMgr *>(data);
+    audioMgr->initOpenSLESEnv();
+    audioMgr->startDecode();
+    pthread_exit(&audioMgr->startTid);
 }
 
 void AudioMgr::initOpenSLESEnv() {
     createEngine();
     createBufferQueueAudioPlayer();
-    //启动缓冲队列回调
-    pcmSimpleBufferQueueCallback(androidSimpleBufferQueueItf, this);
+}
+
+void AudioMgr::startDecode() {
+    if (androidSimpleBufferQueueItf) {
+        //启动缓冲队列回调
+        pcmSimpleBufferQueueCallback(androidSimpleBufferQueueItf, this);
+    }
 }
 
 void AudioMgr::createEngine() {
@@ -155,16 +160,6 @@ void AudioMgr::destroyOpenSLES() {
     }
 }
 
-void *startThread(void *data) {
-    AudioMgr *audioMgr = static_cast<AudioMgr *>(data);
-    audioMgr->initOpenSLESEnv();
-    pthread_exit(&audioMgr->startTid);
-}
-
-void AudioMgr::start() {
-    pthread_create(&startTid, nullptr, startThread, this);
-}
-
 void AudioMgr::callJavaTimeInfo(int cur, int total) {
     if (callJavaMgr != nullptr) {
         callJavaMgr->callTimeInfo(cur, total);
@@ -175,99 +170,90 @@ void pcmSimpleBufferQueueCallback(
         SLAndroidSimpleBufferQueueItf caller,
         void *pContext
 ) {
-    AudioMgr *audioMgr = static_cast<AudioMgr *>(pContext);
-    uint8_t *data = nullptr;
-    int size = 0;
-    int ret = audioMgr->decode(&data, &size);
+    auto *audioMgr = static_cast<AudioMgr *>(pContext);
+    audioMgr->play();
+}
+
+void AudioMgr::play() {
+    int size = decode();
     LOGI("pcmSimpleBufferQueueCallback: size : %d", size);
-    if (ret == 0) {
-        audioMgr->clock += (double) size / (audioMgr->sample_rate * 2 * 2);
-        if (audioMgr->clock - audioMgr->last_clock > 0.1) {
-            audioMgr->callJavaTimeInfo(static_cast<int>(audioMgr->clock), static_cast<int>(audioMgr->duration));
-            audioMgr->last_clock = audioMgr->clock;
+    if (size > 0) {
+        clock += (double) size / (sample_rate * 2 * 2);
+        if (clock - last_clock > 0.1) {
+            callJavaTimeInfo(static_cast<int>(clock), static_cast<int>(formatContext->duration / AV_TIME_BASE));
+            last_clock = clock;
         }
-        (*audioMgr->androidSimpleBufferQueueItf)->Enqueue(
-                audioMgr->androidSimpleBufferQueueItf, data, static_cast<SLuint32>(size));
+        (*androidSimpleBufferQueueItf)->Enqueue(
+                androidSimpleBufferQueueItf, convertBuffer.get(), static_cast<SLuint32>(size));
     }
 }
 
-int AudioMgr::decode(uint8_t **outputBuf, int *size) {
-    int ret = 0;
-    while (status != nullptr && !status->exit) {
-        if (status != nullptr && status->seek) {
+int AudioMgr::decode() {
+    int samples = 0;
+    int errorCode = 0;
+    int count = 0;
+    while (status && !status->exit) {
+
+        if (status && (status->seek || status->pause)) {
             sleep();
             continue;
         }
+
         status->decode = true;
-        if (pktQueue->size() <= 0) {
+
+        if (!hasData()) {
             status->decode = false;
+            sleep();
             continue;
         }
-        if (decodeAPacketFinish) {
-            if (!pktQueue->pop(packet)) {
+
+        if (gotPacket) {
+            if (!packetQueue->pop(packet)) {
                 status->decode = false;
                 continue;
             }
-            ret = avcodec_send_packet(codecContext, packet.get());
-            if (ret != 0) {
-                LOGI("start loop avcodec_send_packet fail ,error msg : %s", av_err2str(ret));
-                decodeAPacketFinish = true;
+            errorCode = avcodec_send_packet(codecContext.get(), packet.get());
+            if (errorCode != 0) {
+                LOGE("audio avcodec_send_packet failed ... ,error msg : %s", av_err2str(errorCode));
+                gotPacket = true;
                 status->decode = false;
                 continue;
             }
         }
         frame = AVWrap::allocAVFrame();
-        ret = avcodec_receive_frame(codecContext, frame.get());
-        if (ret != 0) {
-            LOGI("start loop avcodec_receive_frame fail ,error msg : %s", av_err2str(ret));
-            decodeAPacketFinish = true;
+        errorCode = avcodec_receive_frame(codecContext.get(), frame.get());
+        if (errorCode != 0) {
+            LOGI("audio avcodec_receive_frame failed ...  ,error msg : %s", av_err2str(errorCode));
+            gotPacket = true;
             status->decode = false;
             continue;
         }
-        //消耗 frame
-        swrContext = AVWrap::allocSwrContext();
-        swr_alloc_set_opts(swrContext.get(),
-                           AV_CH_LAYOUT_STEREO,
-                           AV_SAMPLE_FMT_S16,
-                           frame->sample_rate,
-                           frame->channel_layout,
-                           static_cast<AVSampleFormat>(frame->format),
-                           frame->sample_rate,
-                           0,
-                           nullptr
-        );
+        swrContext = AVWrap::allocSwrContext(frame);
         if (!swrContext) {
-            LOGI("start loop swrContext = nullptr ,error msg");
-            decodeAPacketFinish = true;
+            LOGI("swrContext init failed ... ,error msg");
+            gotPacket = true;
             status->decode = false;
             continue;
         }
-        int init = swr_init(swrContext.get());
-        if (init < 0) {
-            LOGI("start loop swr_init fail ,error msg : %s", av_err2str(init));
-            decodeAPacketFinish = true;
-            status->decode = false;
-            continue;
-        }
-        decodeAPacketFinish = false;
-        *size = swr_convert(swrContext.get(),
-                            &swrBuf,
-                            frame->nb_samples,
-                            reinterpret_cast<const uint8_t **>(&frame->data),
-                            frame->nb_samples);
-        *outputBuf = swrBuf;
-        *size *= 4;
+        gotPacket = false;
+        uint8_t *tempBuf = convertBuffer.get();
+        samples = swr_convert(swrContext.get(),
+                              &tempBuf,
+                              frame->nb_samples,
+                              reinterpret_cast<const uint8_t **>(&frame->data),
+                              frame->nb_samples);
 
-        double cur_time = packet->pts * av_q2d(stream->time_base);
+        double cur_time = packet->pts * av_q2d(formatContext->streams[index]->time_base);
         if (cur_time < clock) {
             cur_time = clock;
         }
         clock = cur_time;
-
         status->decode = false;
+        LOGI("AudioMgr::decode() : count %d", count++);
+
         break;
     }
-    return ret;
+    return samples * 2 * 2;
 }
 
 SLuint32 AudioMgr::getCurrentSimpleRate() {
@@ -319,19 +305,19 @@ SLuint32 AudioMgr::getCurrentSimpleRate() {
 }
 
 void AudioMgr::stop() {
-    if (playItf != nullptr) {
+    if (playItf) {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_STOPPED);
     }
 }
 
 void AudioMgr::pause() {
-    if (playItf != nullptr) {
+    if (playItf) {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PAUSED);
     }
 }
 
 void AudioMgr::resume() {
-    if (playItf != nullptr) {
+    if (playItf) {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PLAYING);
     }
 }
@@ -339,7 +325,6 @@ void AudioMgr::resume() {
 void AudioMgr::seek() {
     clock = 0;
     last_clock = 0;
-    if (pktQueue != nullptr) {
-        pktQueue->clear();
-    }
+    packetQueue->clear();
+    avcodec_flush_buffers(codecContext.get());
 }

@@ -5,11 +5,6 @@
 #ifndef MEDIAPLAYERSDK_MEDIAPLAYER_H
 #define MEDIAPLAYERSDK_MEDIAPLAYER_H
 
-extern "C" {
-#include "libavformat/avformat.h"
-#include "libavcodec/avcodec.h"
-};
-
 #include <string>
 #include "AndroidLog.h"
 #include "AudioMgr.h"
@@ -23,12 +18,11 @@ extern "C" {
 using namespace std;
 
 class MediaPlayer {
+
 public:
-    MediaPlayer(CallJavaMgr *callJavaMgr);
+    MediaPlayer(shared_ptr<CallJavaMgr> &callJavaMgr);
 
     ~MediaPlayer();
-
-    int duration = -1;
 
     void prepare(const string urlParam);
 
@@ -40,38 +34,44 @@ public:
 
     void resume();
 
+    int getDuration() {
+        if (formatCtx) {
+            return static_cast<int>(formatCtx->duration / AV_TIME_BASE);
+        }
+        return 0;
+    }
+
     void seek(int time);
 
-    static const unsigned MAX_PACKET_SIZE;
+private:
+    //回调 java 层
+    shared_ptr<CallJavaMgr> &callJavaMgr;
+    shared_ptr<MediaStatus> status;
+
+    string url;
+    shared_ptr<AVFormatContext> formatCtx;
+    bool init;
+
+    shared_ptr<AudioMgr> audioMgr;
+    shared_ptr<VideoMgr> videoMgr;
+
+    pthread_t prepareTid;
+    pthread_t startTid;
+    //seek
+    pthread_mutex_t seek_mutex;
 
 private:
-
-    friend void *readPacket(void *data);
-
     friend void *prepareThread(void *data);
-
-    int openCodec(AVCodecParameters *avCodecParameters, AVCodecContext **avCodecContext);
 
     void prepareFfmpeg();
 
-private:
+    friend void *startThread(void *data);
 
-    shared_ptr<MediaStatus> status;
-    //回调 java 层
-    CallJavaMgr *callJavaMgr;
-
-    string url;
-    shared_ptr<AVFormatContext> spFormatCtx;
-    //audio相关
-    AudioMgr *audioMgr;
-    shared_ptr<VideoMgr> videoMgr;
-
-    pthread_t readPktTid;
-    pthread_t prepareTid;
-    //seek
-    pthread_mutex_t seek_mutex;
+    void readPacket();
 };
 
 void *prepareThread(void *data);
+
+void *startThread(void *data);
 
 #endif //MEDIAPLAYERSDK_MEDIAPLAYER_H

@@ -4,23 +4,22 @@
 
 #include "MediaPlayer.h"
 
-const unsigned MediaPlayer::MAX_PACKET_SIZE = 20;
-
-MediaPlayer::MediaPlayer(CallJavaMgr *callJavaMg) :
-        status(new MediaStatus),
-        callJavaMgr(callJavaMg),
-        spFormatCtx(nullptr),
-        audioMgr(nullptr),
-        videoMgr(nullptr) {
+MediaPlayer::MediaPlayer(shared_ptr<CallJavaMgr> &callJavaMg)
+        : callJavaMgr(callJavaMg),
+          status(make_shared<MediaStatus>()),
+          url(),
+          formatCtx(),
+          init(false),
+          audioMgr(),
+          videoMgr(),
+          prepareTid(),
+          startTid(),
+          seek_mutex() {
     pthread_mutex_init(&seek_mutex, nullptr);
 }
 
 MediaPlayer::~MediaPlayer() {
-    delete audioMgr;
-    audioMgr = nullptr;
-
     pthread_mutex_destroy(&seek_mutex);
-    callJavaMgr = nullptr;
 }
 
 void MediaPlayer::prepare(const string urlParam) {
@@ -29,168 +28,130 @@ void MediaPlayer::prepare(const string urlParam) {
 }
 
 void *prepareThread(void *data) {
-    MediaPlayer *mediaPlayer = static_cast<MediaPlayer *>(data);
+    auto *mediaPlayer = static_cast<MediaPlayer *>(data);
     mediaPlayer->prepareFfmpeg();
     pthread_exit(&mediaPlayer->prepareTid);
 }
 
 void MediaPlayer::prepareFfmpeg() {
-    int ret = 0;//保存函数操作结果码
+    int ret;//保存函数操作结果码
 
     //1.注册协议，复用，编解码器
     av_register_all();
     avformat_network_init();
 
     //2.读取文件头信息，填充AVInputFormat到 AVFormatContext 结构体
-    spFormatCtx = AVWrap::allocAVFormatContext();//分配内存,可能存在分配内存错误情况
-
-    AVFormatContext *formatCtx = spFormatCtx.get();
-    if (!spFormatCtx) {
+    formatCtx = AVWrap::allocAVFormatContext();//分配内存
+    AVFormatContext *tempFormatCtx = formatCtx.get();
+    if (!formatCtx) {
         LOGE("avformat_alloc_context() fail for url : %s", url.c_str());
         return;
     }
-    ret = avformat_open_input(&formatCtx, url.c_str(), nullptr, nullptr);
+
+    ret = avformat_open_input(&tempFormatCtx, url.c_str(), nullptr, nullptr);
     if (ret != 0) {
         LOGE("avformat_open_input() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
         return;
     }
 
     //3.读取流信息
-    ret = avformat_find_stream_info(formatCtx, nullptr);
+    ret = avformat_find_stream_info(tempFormatCtx, nullptr);
     if (ret < 0) {
         LOGE("avformat_find_stream_info() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
         return;
     }
 
-    for (int i = 0; i < spFormatCtx->nb_streams; i++) {
-        if (AVMEDIA_TYPE_AUDIO == spFormatCtx->streams[i]->codecpar->codec_type) {
-            duration = spFormatCtx->duration / AV_TIME_BASE;
-            audioMgr = new AudioMgr(callJavaMgr, status, i, spFormatCtx->streams[i],
-                                    spFormatCtx->duration / AV_TIME_BASE);
+    for (int i = 0; i < formatCtx->nb_streams; i++) {
+        if (AVMEDIA_TYPE_AUDIO == formatCtx->streams[i]->codecpar->codec_type) {
+            audioMgr = make_shared<AudioMgr>(callJavaMgr, status, i, formatCtx);
 
-        } else if (AVMEDIA_TYPE_VIDEO == spFormatCtx->streams[i]->codecpar->codec_type) {
-            videoMgr = make_shared<VideoMgr>(status, callJavaMgr, i, spFormatCtx->streams[i]);
+        } else if (AVMEDIA_TYPE_VIDEO == formatCtx->streams[i]->codecpar->codec_type) {
+            videoMgr = make_shared<VideoMgr>(callJavaMgr, status, i, formatCtx);
         }
     }
 
-    if (audioMgr == nullptr) {
-        LOGE("audioMgr.streamIndex < 0 for url : %s", url.c_str());
+    if (!audioMgr || !videoMgr) {
+        LOGE("audioMgr or videoMgr is null for url : %s", url.c_str());
         return;
     }
 
-    if (videoMgr == nullptr) {
-        LOGE("videoMgr.streamIndex < 0 for url : %s", url.c_str());
-        return;
-    }
-
-    videoMgr->setAudioClock(&audioMgr->clock);
+    videoMgr->setAudioMgr(audioMgr);
 
     //4.获取解码器并打开
-    ret = openCodec(audioMgr->stream->codecpar, &audioMgr->codecContext);
-    if (ret != 0) {
-        LOGE("openCodec audio fail for url : %s", url.c_str());
+    if (!audioMgr->openCodec()) {
         return;
     }
-    AVCodecContext *vCodecContext = nullptr;
-    ret = openCodec((*videoMgr).getCodecParameters(), &vCodecContext);
-    if (ret != 0) {
-        LOGE("openCodec video fail for url : %s", url.c_str());
+    if (!videoMgr->openCodec()) {
         return;
     }
-    (*videoMgr).setCodecContext(vCodecContext);
 
     callJavaMgr->callPrepared();
     LOGI("准备好了！！！");
+
+    init = true;
 }
 
-int MediaPlayer::openCodec(AVCodecParameters *avCodecParameters, AVCodecContext **avCodecContext) {
-    AVCodec *codec = avcodec_find_decoder(avCodecParameters->codec_id);
-    if (codec == nullptr) {
-        LOGE("avcodec_find_decoder() fail for url : %s", url.c_str());
-        return -1;
-    }
-    AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-    if (codecContext == nullptr) {
-        LOGE("avcodec_alloc_context3() fail for url : %s", url.c_str());
-        return -1;
-    }
-    int ret = 0;
-    ret = avcodec_parameters_to_context(codecContext, avCodecParameters);
-    if (ret < 0) {
-        LOGE("avcodec_parameters_to_context() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
-        return -1;
-    }
-    *avCodecContext = codecContext;
-    ret = avcodec_open2(codecContext, codec, nullptr);
-    if (ret != 0) {
-        LOGE("avcodec_open2() fail for url : %s , error msg : %s", url.c_str(), av_err2str(ret));
-        return -1;
-    }
-    return 0;
+void MediaPlayer::start() {
+    pthread_create(&startTid, nullptr, startThread, this);
 }
 
-void *readPacket(void *data) {
+void *startThread(void *data) {
     MediaPlayer *mediaPlayer = static_cast<MediaPlayer *>(data);
+    mediaPlayer->readPacket();
+    pthread_exit(&mediaPlayer->startTid);
+}
 
-    if (mediaPlayer->audioMgr == nullptr) {
-        return nullptr;
+void MediaPlayer::readPacket() {
+    if (!init) {
+        return;
     }
 
-    int ret = 0;
-    int count = 0;
+    int acount = 0;
     int vcount = 0;
-    mediaPlayer->audioMgr->start();
-    mediaPlayer->videoMgr.operator*().start();
+    int ret = 0;
+    audioMgr->start();
+    videoMgr->start();
 
-    while (!mediaPlayer->status->exit) {
-        if (mediaPlayer->status->seek) {
+    while (!status->exit) {
+
+        if (status->seek || status->pause) {
             sleep();
             continue;
         }
-        mediaPlayer->status->read = true;
-        if (mediaPlayer->audioMgr->pktQueue->size() > mediaPlayer->MAX_PACKET_SIZE
-            || mediaPlayer->videoMgr.operator*().getSize() > mediaPlayer->MAX_PACKET_SIZE) {
+        status->read = true;
+
+        if (!videoMgr->canFill() || !videoMgr->canFill()) {
             sleep();
             continue;
         }
 
         shared_ptr<AVPacket> packet = AVWrap::allocAVPacket();
 
-        pthread_mutex_lock(&mediaPlayer->seek_mutex);
-        ret = av_read_frame(mediaPlayer->spFormatCtx.get(), packet.get());
-        pthread_mutex_unlock(&mediaPlayer->seek_mutex);
-
+        pthread_mutex_lock(&seek_mutex);
+        ret = av_read_frame(formatCtx.get(), packet.get());
+        pthread_mutex_unlock(&seek_mutex);
         if (ret == 0) {
-            if (packet->stream_index == mediaPlayer->audioMgr->streamIndex) {
-                mediaPlayer->audioMgr->pktQueue->push(packet);
-                LOGI("a --- 读取第 %d 帧包", count++);
-            } else if (packet->stream_index == mediaPlayer->videoMgr.operator*().getIndex()) {
-                mediaPlayer->videoMgr->putPacket(packet);
-                LOGI("v --- 读取第 %d 帧包", vcount++);
-            } else {
-
+            if (packet->stream_index == audioMgr->getStreamIndex()) {
+                audioMgr->putPacket(packet);
+                LOGI("MediaPlayer::readPacket() audio : count %d", acount++);
+            } else if (packet->stream_index == videoMgr->getStreamIndex()) {
+                videoMgr->putPacket(packet);
+                LOGI("MediaPlayer::readPacket() video : count %d", vcount++);
             }
         } else {
-            //等待数据包消耗完成
-            while (!mediaPlayer->status->exit) {
-                if (mediaPlayer->audioMgr->pktQueue->size() > 0) {
+            //无数据包了，等待数据包消耗完成
+            while (!status->exit) {
+                if (audioMgr->hasData() || videoMgr->hasData()) {
                     sleep();
                 } else {
-                    mediaPlayer->status->exit = true;
+                    status->exit = true;
                 }
             }
         }
     }
 
-    LOGI("读取完成----------");
-    mediaPlayer->callJavaMgr->callCompleted();
-
-    mediaPlayer->status->read = false;
-    pthread_exit(&mediaPlayer->readPktTid);
-}
-
-void MediaPlayer::start() {
-    pthread_create(&readPktTid, nullptr, readPacket, this);
+    callJavaMgr->callCompleted();
+    status->read = false;
 }
 
 void MediaPlayer::stop() {
@@ -207,12 +168,14 @@ void MediaPlayer::stop() {
 }
 
 void MediaPlayer::pause() {
+    status->pause = true;
     if (audioMgr != nullptr) {
         audioMgr->pause();
     }
 }
 
 void MediaPlayer::resume() {
+    status->pause = false;
     if (audioMgr != nullptr) {
         audioMgr->resume();
     }
@@ -220,11 +183,11 @@ void MediaPlayer::resume() {
 
 //耗时，需要子线程中调用
 void MediaPlayer::seek(int time) {
-    if (spFormatCtx->duration < 0) {
+    if (formatCtx->duration < 0) {
         //直播流
         return;
     }
-    if (time < 0 || time > spFormatCtx->duration / AV_TIME_BASE) {
+    if (time < 0 || time > formatCtx->duration / AV_TIME_BASE) {
         return;
     }
     if (audioMgr == nullptr) {
@@ -235,13 +198,12 @@ void MediaPlayer::seek(int time) {
     }
     if (!status->seek) {
         status->seek = true;
-        audioMgr->seek();
-        videoMgr.operator*().seek();
         int64_t rel = time * AV_TIME_BASE;
         pthread_mutex_lock(&seek_mutex);
-        avcodec_flush_buffers(audioMgr->codecContext);
-//        avformat_seek_file(spFormatCtx, audioMgr->streamIndex, INT64_MIN, rel, INT64_MAX, 0);
-        avformat_seek_file(spFormatCtx.get(), -1, INT64_MIN, rel, INT64_MAX, 0);
+        audioMgr->seek();
+        videoMgr->seek();
+//        avformat_seek_file(formatCtx, audioMgr->streamIndex, INT64_MIN, rel, INT64_MAX, 0);
+        avformat_seek_file(formatCtx.get(), -1, INT64_MIN, rel, INT64_MAX, 0);
         pthread_mutex_unlock(&seek_mutex);
         status->seek = false;
     }

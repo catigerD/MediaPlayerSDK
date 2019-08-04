@@ -6,40 +6,62 @@
 #define MEDIAPLAYERSDK_AUDIOMGR_H
 
 extern "C" {
-#include "libavformat/avformat.h"
-#include "libavcodec/avcodec.h"
-#include "libavutil/time.h"
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
-#include "libswresample/swresample.h"
 };
 
-#include "PacketQueue.h"
-#include "MediaStatus.h"
-#include "AndroidLog.h"
-#include <assert.h>
-#include "CallJavaMgr.h"
 #include "Common.h"
-#include "AVWrap.h"
+#include "MediaMgr.h"
+#include "assert.h"
 
-class AudioMgr {
+class AudioMgr : public MediaMgr {
+
+
+public:
+    AudioMgr(shared_ptr<CallJavaMgr> &callJavaMgr, shared_ptr<MediaStatus> &status, int index,
+             shared_ptr<AVFormatContext> &formatContext);
+
+    ~AudioMgr();
+
+    void start();
+
+    void stop();
+
+    void pause();
+
+    void resume();
+
+    void seek();
+
 private:
-    friend void *startThread(void *data);
+    friend void *audioStartThread(void *data);
+
+    void initOpenSLESEnv();
+
+    void createEngine();
+
+    void createBufferQueueAudioPlayer();
+
+    void startDecode();
+
+    void destroyOpenSLES();
 
     friend void pcmSimpleBufferQueueCallback(
             SLAndroidSimpleBufferQueueItf caller,
             void *pContext
     );
 
-    //音频属性
-    int64_t duration;
+    int decode();
 
-    //decode相关
+    void play();
+
+    SLuint32 getCurrentSimpleRate();
+
+    void callJavaTimeInfo(int cur, int total);
+
+private:
+
     pthread_t startTid;
-    bool decodeAPacketFinish = true;
-    int sample_rate = 0;
-    uint8_t *swrBuf = nullptr;
-
     //OpenSL
     //引擎接口
     SLObjectItf engineObject;
@@ -54,54 +76,21 @@ private:
     //缓冲器队列
     SLAndroidSimpleBufferQueueItf androidSimpleBufferQueueItf;
 
-    void initOpenSLESEnv();
+    //音频某些格式一个 packet 可能包含多个 frame
+    bool gotPacket;
+    int sample_rate;
+    shared_ptr<uint8_t> convertBuffer;
 
-    void createEngine();
-
-    void createBufferQueueAudioPlayer();
-
-    void destroyOpenSLES();
-
-    //解码相关资源
-    shared_ptr<AVPacket> packet;
-    shared_ptr<AVFrame> frame;
-    shared_ptr<SwrContext> swrContext;
-
-    int decode(uint8_t **outputBuf, int *size);
-
-    SLuint32 getCurrentSimpleRate();
-
-    //回调 java 层
-    CallJavaMgr *callJavaMgr;
-
-    void callJavaTimeInfo(int cur, int total);
-
-public:
-    AudioMgr(CallJavaMgr *callJavaMgr, shared_ptr<MediaStatus> &status, int index, AVStream *stream, int64_t duration);
-
-    ~AudioMgr();
-
-    shared_ptr<MediaStatus> &status;
-    AVStream *stream = nullptr;
-
-    PacketQueue *pktQueue;
-    int streamIndex;
-    AVCodecContext *codecContext = nullptr;
-    //当前播放时间
-    double clock = 0;
     //减少 java 层调用间隔
     double last_clock = 0;
 
-    void start();
-
-    void stop();
-
-    void pause();
-
-    void resume();
-
-    void seek();
+    //解码相关资源
+    shared_ptr<AVPacket> packet;//正在解码的 packet
+    shared_ptr<AVFrame> frame;//解码完整的 frame
+    shared_ptr<SwrContext> swrContext;
 };
+
+void *audioStartThread(void *data);
 
 void pcmSimpleBufferQueueCallback(
         SLAndroidSimpleBufferQueueItf caller,
