@@ -9,12 +9,13 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 };
 
-#include <queue>
 #include <pthread.h>
 #include "MediaStatus.h"
 #include <memory>
 #include "Common.h"
 #include "Lock.h"
+#include <list>
+#include "AndroidLog.h"
 
 using namespace std;
 
@@ -29,15 +30,19 @@ public:
 
     bool pop(shared_ptr<AVPacket> &packet);
 
-    queue<shared_ptr<AVPacket>>::size_type size();
+    list<shared_ptr<AVPacket>>::size_type size();
 
     void clear();
 
+    void removeBeforeAudioFrame(AVRational time_base, double audio_clock);
+
 private:
     shared_ptr<MediaStatus> &status;
-    queue<shared_ptr<AVPacket>> pktQueue;
+    list<shared_ptr<AVPacket>> pktQueue;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
+
+    int remove_count;
 };
 
 #endif //MEDIAPLAYERSDK_PACKETQUEUE_H

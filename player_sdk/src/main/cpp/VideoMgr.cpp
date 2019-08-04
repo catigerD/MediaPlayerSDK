@@ -5,7 +5,7 @@
 #include <common/AVWrap.h>
 #include "VideoMgr.h"
 
-const unsigned VideoMgr::MAX_FRAME_SIZE = 3;
+const unsigned VideoMgr::MAX_FRAME_SIZE = 1;
 const double VideoMgr::DEFAULT_DELAY_TIME = 0.04;
 const double VideoMgr::SYNCHRONIZE_SCOPE_MIN = 0.003;
 const double VideoMgr::SYNCHRONIZE_SCOPE_MID = 0.5;
@@ -46,6 +46,7 @@ void VideoMgr::decode() {
             sleep();
             continue;
         }
+        packetQueue->removeBeforeAudioFrame(formatContext->streams[index]->time_base, audioMgr->getClock());
         packetQueue->pop(packet);
         errorCode = avcodec_send_packet(codecContext.get(), packet.get());
         if (errorCode != 0) {

@@ -14,7 +14,8 @@ MediaMgr::MediaMgr(shared_ptr<CallJavaMgr> &callJavaMgr, shared_ptr<MediaStatus>
           formatContext(formatContext),
           codecContext(),
           packetQueue(new PacketQueue(status)),
-          clock(0) {
+          clock(0),
+          last_clock(0) {
 
 }
 

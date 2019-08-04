@@ -31,7 +31,12 @@ public:
 
     void resume();
 
-    void seek();
+    void seek() {
+        clock = 0;
+        last_clock = 0;
+        packetQueue->clear();
+        avcodec_flush_buffers(codecContext.get());
+    }
 
 private:
     friend void *audioStartThread(void *data);

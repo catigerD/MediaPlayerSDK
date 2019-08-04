@@ -33,6 +33,8 @@ public:
     }
 
     void seek() {
+        clock =0;
+        delayTime = 0;
         packetQueue->clear();
         frameQueue->clear();
     }

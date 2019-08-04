@@ -55,6 +55,7 @@ protected:
     shared_ptr<PacketQueue> packetQueue;
 
     double clock;
+    double last_clock;
 
 private:
 

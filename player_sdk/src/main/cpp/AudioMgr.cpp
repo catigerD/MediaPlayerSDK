@@ -321,10 +321,3 @@ void AudioMgr::resume() {
         (*playItf)->SetPlayState(playItf, SL_PLAYSTATE_PLAYING);
     }
 }
-
-void AudioMgr::seek() {
-    clock = 0;
-    last_clock = 0;
-    packetQueue->clear();
-    avcodec_flush_buffers(codecContext.get());
-}
