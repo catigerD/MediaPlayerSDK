@@ -81,7 +81,7 @@ bool VideoMgr::scaleYUV(shared_ptr<AVFrame> &inFrame, shared_ptr<AVFrame> &outFr
         LOGE("swsContext == nullptr");
         return false;
     }
-    shared_ptr<AVFrame> yuvFrame = AVWrap::allocAVFrame();
+    shared_ptr<AVFrame> yuvFrame = AVWrap::allocAVImageFrame();
     int num = av_image_get_buffer_size(AV_PIX_FMT_YUV420P, inFrame->width, inFrame->height, 1);
     uint8_t *buf = new uint8_t[num];
     int ret = av_image_fill_arrays(

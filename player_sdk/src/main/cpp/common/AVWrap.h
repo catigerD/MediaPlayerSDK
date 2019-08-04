@@ -37,6 +37,11 @@ inline void freeAVFrame(AVFrame *frame) {
     av_free(frame);
 }
 
+inline void freeAVImageFrame(AVFrame *frame) {
+    av_freep(frame);
+    av_free(frame);
+}
+
 inline void freeSwsContext(SwsContext *context) {
     sws_freeContext(context);
 }
@@ -61,6 +66,10 @@ public:
 
     static shared_ptr<AVFrame> allocAVFrame() {
         return shared_ptr<AVFrame>(av_frame_alloc(), freeAVFrame);
+    }
+
+    static shared_ptr<AVFrame> allocAVImageFrame() {
+        return shared_ptr<AVFrame>(av_frame_alloc(), freeAVImageFrame);
     }
 
     static shared_ptr<SwsContext> allocSwsContext() {
