@@ -26,64 +26,15 @@ CallJavaMgr::~CallJavaMgr() {
 }
 
 void CallJavaMgr::callPrepared() {
-    if (!mid_prepared) {
-        return;
-    }
-    JNIEnv *env;
-    bool isAttach = false;
-    int ret;
-    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
-    if (JNI_OK != ret) {
-        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            return;
-        }
-        isAttach = true;
-    }
-    //todo 使用 lambda
-    env->CallVoidMethod(mObj, mid_prepared);
-    if (isAttach) {
-        mVM->DetachCurrentThread();
-    }
+    callJavaMethod(mid_prepared);
 }
 
 void CallJavaMgr::callCompleted() {
-    if (!mid_completed) {
-        return;
-    }
-    JNIEnv *env;
-    bool isAttach = false;
-    int ret;
-    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
-    if (JNI_OK != ret) {
-        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            return;
-        }
-        isAttach = true;
-    }
-    env->CallVoidMethod(mObj, mid_completed);
-    if (isAttach) {
-        mVM->DetachCurrentThread();
-    }
+    callJavaMethod(mid_completed);
 }
 
 void CallJavaMgr::callTimeInfo(int cur, int total) {
-    if (!mid_time_info) {
-        return;
-    }
-    JNIEnv *env;
-    bool isAttach = false;
-    int ret;
-    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
-    if (JNI_OK != ret) {
-        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            return;
-        }
-        isAttach = true;
-    }
-    env->CallVoidMethod(mObj, mid_time_info, cur, total);
-    if (isAttach) {
-        mVM->DetachCurrentThread();
-    }
+    callJavaMethod(mid_time_info, cur, total);
 }
 
 void CallJavaMgr::callRender(int width, int height, char *y, char *u, char *v) {
@@ -112,7 +63,27 @@ void CallJavaMgr::callRender(int width, int height, char *y, char *u, char *v) {
     env->DeleteLocalRef(yArray);
     env->DeleteLocalRef(uArray);
     env->DeleteLocalRef(vArray);
-    //todo 内存泄漏的元凶？
+    if (isAttach) {
+        mVM->DetachCurrentThread();
+    }
+}
+
+template<typename... Args>
+void CallJavaMgr::callJavaMethod(const jmethodID &mid, const Args &... args) {
+    if (!mid) {
+        return;
+    }
+    JNIEnv *env;
+    bool isAttach = false;
+    int ret;
+    ret = mVM->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    if (JNI_OK != ret) {
+        if (mVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            return;
+        }
+        isAttach = true;
+    }
+    env->CallVoidMethod(mObj, mid, args...);
     if (isAttach) {
         mVM->DetachCurrentThread();
     }

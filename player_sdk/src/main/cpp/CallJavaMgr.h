@@ -24,6 +24,10 @@ private:
     jmethodID mid_time_info;
     jmethodID mid_render;
 
+private:
+    template<typename... Args>
+    void callJavaMethod(const jmethodID &mid, const Args &... args);
+
 public:
     CallJavaMgr(JavaVM *vm, JNIEnv *env, jobject jo);
 
